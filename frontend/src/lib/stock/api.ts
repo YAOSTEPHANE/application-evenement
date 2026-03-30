@@ -37,6 +37,11 @@ export function getResolvedApiBaseUrl(): string {
   }
   try {
     const apiUrl = new URL(base);
+    // En HTTPS, on route via Next (rewrites /api/*) lorsque le backend est sur le même hostname.
+    // Ainsi, le navigateur n’appelle jamais directement le backend en HTTP → plus de Mixed Content.
+    if (window.location.protocol === "https:" && apiUrl.hostname === window.location.hostname) {
+      return "";
+    }
     const pageHost = window.location.hostname;
     const apiHost = apiUrl.hostname;
     if (!isLoopbackHost(pageHost) && isLoopbackHost(apiHost)) {
