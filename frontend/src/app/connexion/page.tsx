@@ -5,18 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   fetchAuthMe,
-  getResolvedApiBaseUrl,
   loginViaApi,
 } from "@/lib/stock/api";
 import { setSessionUserId } from "@/lib/stock/session";
-
-function envApiBaseForHydration(): string {
-  const raw = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  if (!raw) {
-    return "http://localhost:3001";
-  }
-  return raw.replace(/\/+$/, "");
-}
 
 export default function ConnexionPage() {
   const router = useRouter();
@@ -25,7 +16,6 @@ export default function ConnexionPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [apiDisplayUrl, setApiDisplayUrl] = useState(envApiBaseForHydration);
 
   const verifyExistingSession = useCallback(async () => {
     setCheckingSession(true);
@@ -38,15 +28,11 @@ export default function ConnexionPage() {
         return;
       }
     } catch {
-      setError(`Impossible de joindre l’API (${getResolvedApiBaseUrl()}).`);
+      setError("Impossible de joindre le serveur. Réessayez dans un instant.");
     } finally {
       setCheckingSession(false);
     }
   }, [router]);
-
-  useEffect(() => {
-    setApiDisplayUrl(getResolvedApiBaseUrl());
-  }, []);
 
   useEffect(() => {
     void verifyExistingSession();
@@ -100,13 +86,7 @@ export default function ConnexionPage() {
             Connexion
           </h2>
           <p className="auth-card-desc">
-            Connectez-vous avec votre nom d’utilisateur ou votre adresse e-mail et votre mot de passe.
-            Les administrateurs peuvent créer des comptes depuis l’onglet Utilisateurs.
-          </p>
-
-          <p className="auth-card-desc fs12 fc-3 auth-card-desc--tight">
-            Comptes de démo après seed : identifiant <code>admin</code> — mot de passe défini par{" "}
-            <code>SEED_DEMO_PASSWORD</code> sur le backend (souvent <code>Demo1234!</code>).
+            Connectez-vous avec votre identifiant (ou e-mail) et votre mot de passe.
           </p>
 
           {error ? (
@@ -146,12 +126,6 @@ export default function ConnexionPage() {
               {submitting ? "Connexion…" : "Se connecter"}
             </button>
           </form>
-
-          <p className="auth-empty fs12 auth-empty--api-hint">
-            API : <code className="auth-code">{apiDisplayUrl}</code> — en cas d’erreur réseau, vérifiez{" "}
-            <code className="auth-code">NEXT_PUBLIC_API_BASE_URL</code> et que le backend accepte les cookies
-            (CORS avec credentials).
-          </p>
         </section>
       </div>
     </div>
