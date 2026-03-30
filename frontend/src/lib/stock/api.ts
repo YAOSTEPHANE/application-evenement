@@ -36,11 +36,17 @@ export function getResolvedApiBaseUrl(): string {
     return base;
   }
   try {
-    // Mixed Content (production Vercel) : dès que la page est en HTTPS,
-    // on force les appels à passer par le front Next via des chemins relatifs `/api/*`.
-    // Les rewrites Next relaient ensuite vers le backend.
+    // En HTTPS, on évite le mixed-content uniquement si l'API cible est en HTTP.
+    // Si la base API est déjà en HTTPS, on conserve l'URL absolue (pas de dépendance à une rewrite /api).
     if (window.location.protocol === "https:") {
-      return "";
+      try {
+        const secureApiUrl = new URL(base);
+        if (secureApiUrl.protocol !== "https:") {
+          return "";
+        }
+      } catch {
+        return "";
+      }
     }
 
     const apiUrl = new URL(base);
