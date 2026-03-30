@@ -20,16 +20,50 @@ function parseAllowedOrigins(): string[] {
   return ["http://localhost:3000", "http://127.0.0.1:3000"];
 }
 
+function requestHostnames(request: NextRequest): string[] {
+  const seen = new Set<string>();
+  const forwarded = request.headers.get("x-forwarded-host");
+  if (forwarded) {
+    for (const part of forwarded.split(",")) {
+      const h = part.trim().split(":")[0];
+      if (h) {
+        seen.add(h);
+      }
+    }
+  }
+  const host = request.headers.get("host")?.split(":")[0];
+  if (host) {
+    seen.add(host);
+  }
+  const nextHost = request.nextUrl.hostname;
+  if (nextHost) {
+    seen.add(nextHost);
+  }
+  return [...seen];
+}
+
+function isSameOriginAsRequest(request: NextRequest, origin: string): boolean {
+  try {
+    const originHost = new URL(origin).hostname;
+    return requestHostnames(request).some((h) => h === originHost);
+  } catch {
+    return false;
+  }
+}
+
 function applyApiCors(request: NextRequest, response: NextResponse): NextResponse {
   const origin = request.headers.get("origin");
   const allowed = parseAllowedOrigins();
+  const sameOrigin = Boolean(origin && isSameOriginAsRequest(request, origin));
 
   const allowOrigin =
     process.env.NODE_ENV === "development" && origin
       ? origin
       : origin && allowed.includes(origin)
         ? origin
-        : undefined;
+        : sameOrigin
+          ? origin
+          : undefined;
 
   if (allowOrigin) {
     response.headers.set("Access-Control-Allow-Origin", allowOrigin);
@@ -57,8 +91,18 @@ function originForbidden(request: NextRequest): boolean {
   if (process.env.NODE_ENV === "development") {
     return false;
   }
-  const allowed = parseAllowedOrigins();
-  return allowed.length > 0 && !allowed.includes(origin);
+  if (isSameOriginAsRequest(request, origin)) {
+    return false;
+  }
+  const raw = process.env.CORS_ALLOWED_ORIGINS?.trim();
+  if (!raw) {
+    return false;
+  }
+  const explicit = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return explicit.length > 0 && !explicit.includes(origin);
 }
 
 function isPublicApiPath(pathname: string): boolean {
