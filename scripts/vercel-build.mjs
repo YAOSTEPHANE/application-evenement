@@ -21,8 +21,18 @@ if (!existsSync(rootPkg) || !existsSync(frontendPkg)) {
   process.exit(1);
 }
 
-execSync("npm run build --workspace frontend", {
-  cwd: repoRoot,
-  stdio: "inherit",
-  env: process.env,
-});
+try {
+  execSync("npm run build --workspace frontend", {
+    cwd: repoRoot,
+    stdio: "inherit",
+    env: process.env,
+  });
+} catch (err) {
+  const code = err?.status ?? err?.code;
+  console.error(
+    "\n[vercel-build] La commande « npm run build --workspace frontend » a échoué",
+    code != null ? `(code ${code}).` : ".",
+    "Remontez dans les logs Vercel : l’erreur réelle (Prisma, Next, TypeScript) est au-dessus de cette trace Node.\n",
+  );
+  process.exit(typeof code === "number" ? code : 1);
+}

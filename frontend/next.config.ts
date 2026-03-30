@@ -4,12 +4,10 @@ import type { NextConfig } from "next";
 const prismaClientAlias = path.resolve(__dirname, ".prisma-generated");
 
 const nextConfig: NextConfig = {
-  // Client Prisma généré hors node_modules (voir prisma/schema.prisma) — alias pour Webpack et Turbopack.
-  experimental: {
-    turbo: {
-      resolveAlias: {
-        "@prisma/client": prismaClientAlias,
-      },
+  // Client Prisma généré hors node_modules (voir prisma/schema.prisma) — alias Webpack (build prod) et Turbopack (next dev --turbopack).
+  turbopack: {
+    resolveAlias: {
+      "@prisma/client": prismaClientAlias,
     },
   },
   webpack: (config, { isServer }) => {
