@@ -5,6 +5,9 @@
     "frontend",
     "backend"
   ],
+  "optionalDependencies": {
+    "lightningcss-linux-x64-gnu": "1.32.0"
+  },
   "scripts": {
     "vercel:reset-install": "node scripts/reset-vercel-install.mjs",
     "dev:frontend": "npm run dev --workspace frontend",
