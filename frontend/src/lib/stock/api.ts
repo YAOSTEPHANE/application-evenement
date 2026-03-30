@@ -281,7 +281,38 @@ export type AuthMeUser = {
 };
 
 export async function loginViaApi(identifier: string, password: string): Promise<{ user: AuthMeUser }> {
-  const response = await fetch(resolveApiUrl("/api/auth/login"), {
+  const loginUrl = resolveApiUrl("/api/auth/login");
+  if (typeof window !== "undefined") {
+    // #region agent log
+    void fetch("http://127.0.0.1:27772/ingest/9a36c12d-ef1f-4d76-9ab2-d5fb877f7df6", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "6cb17d",
+      },
+      body: JSON.stringify({
+        sessionId: "6cb17d",
+        location: "frontend/src/lib/stock/api.ts:loginViaApi",
+        message: "client login fetch target",
+        hypothesisId: "H2",
+        timestamp: Date.now(),
+        runId: "pre-fix",
+        data: {
+          pageOrigin: window.location.origin,
+          resolvedApiBase: getResolvedApiBaseUrl() || "(empty)",
+          loginUrlHost: (() => {
+            try {
+              return new URL(loginUrl).host;
+            } catch {
+              return "(relative)";
+            }
+          })(),
+        },
+      }),
+    }).catch(() => {});
+    // #endregion
+  }
+  const response = await fetch(loginUrl, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -314,7 +345,38 @@ export async function logoutViaApi(): Promise<void> {
 
 /** Session cookie (sans effet de bord si 401). */
 export async function fetchAuthMe(): Promise<AuthMeUser | null> {
-  const response = await fetch(resolveApiUrl("/api/auth/me"), { credentials: "include" });
+  const meUrl = resolveApiUrl("/api/auth/me");
+  if (typeof window !== "undefined") {
+    // #region agent log
+    void fetch("http://127.0.0.1:27772/ingest/9a36c12d-ef1f-4d76-9ab2-d5fb877f7df6", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "6cb17d",
+      },
+      body: JSON.stringify({
+        sessionId: "6cb17d",
+        location: "frontend/src/lib/stock/api.ts:fetchAuthMe",
+        message: "client me fetch target",
+        hypothesisId: "H2",
+        timestamp: Date.now(),
+        runId: "pre-fix",
+        data: {
+          pageOrigin: window.location.origin,
+          resolvedApiBase: getResolvedApiBaseUrl() || "(empty)",
+          meUrlHost: (() => {
+            try {
+              return new URL(meUrl).host;
+            } catch {
+              return "(relative)";
+            }
+          })(),
+        },
+      }),
+    }).catch(() => {});
+    // #endregion
+  }
+  const response = await fetch(meUrl, { credentials: "include" });
   if (response.status === 401) {
     return null;
   }

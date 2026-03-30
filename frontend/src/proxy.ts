@@ -1,8 +1,39 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { getJwtSecretKey, SESSION_COOKIE_NAME } from "@/lib/session-token";
+
+// #region agent log
+function agentLogProxy(hypothesisId: string, message: string, data: Record<string, unknown>): void {
+  const payload = {
+    sessionId: "6cb17d",
+    location: "frontend/src/proxy.ts",
+    message,
+    hypothesisId,
+    timestamp: Date.now(),
+    runId: "pre-fix",
+    data,
+  };
+  try {
+    const logPath = path.join(process.cwd(), "..", "debug-6cb17d.log");
+    fs.appendFileSync(logPath, `${JSON.stringify(payload)}\n`, "utf8");
+  } catch {
+    // ignore (ex. Vercel FS read-only hors cwd)
+  }
+  void fetch("http://127.0.0.1:27772/ingest/9a36c12d-ef1f-4d76-9ab2-d5fb877f7df6", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "6cb17d",
+    },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+// #endregion
 
 /**
  * Next.js détecte `middleware.ts` et `proxy.ts` comme deux façons concurrentes de faire du “edge handling”.
@@ -115,6 +146,45 @@ export async function proxy(request: NextRequest) {
 
   if (!pathname.startsWith("/api")) {
     return NextResponse.next();
+  }
+
+  if (pathname === "/api/auth/login" || pathname === "/api/auth/me") {
+    const origin = request.headers.get("origin");
+    const forwardedHost = request.headers.get("x-forwarded-host");
+    const host = request.headers.get("host");
+    const nextHostname = request.nextUrl.hostname;
+    let sameOrigin = false;
+    if (origin) {
+      try {
+        sameOrigin = isSameOriginAsRequest(request, origin);
+      } catch {
+        sameOrigin = false;
+      }
+    }
+    const forbidden = originForbidden(request);
+    const allowed = parseAllowedOrigins();
+    // #region agent log
+    agentLogProxy("H1", "proxy auth path cors gate", {
+      pathname,
+      method: request.method,
+      originPresent: Boolean(origin),
+      originHost: origin ? (() => {
+        try {
+          return new URL(origin).hostname;
+        } catch {
+          return "(parse error)";
+        }
+      })() : null,
+      forwardedHost,
+      host,
+      nextHostname,
+      sameOrigin,
+      originForbidden: forbidden,
+      allowedOriginsCount: allowed.length,
+      corsEnvSet: Boolean(process.env.CORS_ALLOWED_ORIGINS?.trim()),
+      nodeEnv: process.env.NODE_ENV,
+    });
+    // #endregion
   }
 
   if (request.method === "OPTIONS") {
