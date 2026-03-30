@@ -1011,3 +1011,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--text4)}
 
+/* Écran de chargement du shell client-only (évite les erreurs d’hydratation si une extension ajoute des attributs aux champs) */
+.app-client-loading{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--text2);
+  font-family:var(--font);
+}

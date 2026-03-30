@@ -1,6 +1,6 @@
 /**
  * Après `npm ci`, npm peut omettre les optionnels Linux si le lockfile vient d’un autre OS.
- * Sur Vercel (linux x64 glibc), force l’installation du binding natif utilisé par Tailwind 4 / lightningcss.
+ * Sur Vercel (linux x64 glibc), force les bindings natifs Tailwind 4 (@tailwindcss/oxide) et lightningcss.
  *
  * - CWD = racine du monorepo : `npm install … -w frontend`
  * - CWD = dossier `frontend` seul : `npm install …` (sans `-w`)
@@ -26,14 +26,17 @@ const isMonorepoRoot =
   hasChildFrontend &&
   (Array.isArray(pkg.workspaces) || typeof pkg.workspaces === "object");
 
+const nativeLinux =
+  "lightningcss-linux-x64-gnu@1.32.0 @tailwindcss/oxide-linux-x64-gnu@4.2.2";
+
 if (isMonorepoRoot) {
-  execSync("npm install lightningcss-linux-x64-gnu@1.32.0 -w frontend --no-save", {
+  execSync(`npm install ${nativeLinux} -w frontend --no-save`, {
     stdio: "inherit",
     env: process.env,
     cwd,
   });
 } else {
-  execSync("npm install lightningcss-linux-x64-gnu@1.32.0 --no-save", {
+  execSync(`npm install ${nativeLinux} --no-save`, {
     stdio: "inherit",
     env: process.env,
     cwd,
