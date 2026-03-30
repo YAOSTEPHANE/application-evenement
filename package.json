@@ -1,6 +1,9 @@
 {
   "name": "stockevent-monorepo",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "workspaces": [
     "frontend",
     "backend"
