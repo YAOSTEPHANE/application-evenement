@@ -49,12 +49,33 @@ function applyApiCors(request: NextRequest, response: NextResponse): NextRespons
   return response;
 }
 
+/**
+ * Même origine (monolithe Next sur Vercel, etc.) : le navigateur envoie Origin = l’URL du site,
+ * qui doit être autorisée même si CORS_ALLOWED_ORIGINS n’est pas encore configuré (sinon 403 sur /api/auth/login en prod).
+ */
+function isSameOriginAsRequest(request: NextRequest, origin: string): boolean {
+  try {
+    const originUrl = new URL(origin);
+    const forwarded = request.headers.get("x-forwarded-host");
+    const rawHost =
+      (forwarded?.split(",")[0]?.trim() ?? request.headers.get("host") ?? "").split(":")[0];
+    const reqHostname = request.nextUrl.hostname;
+    const target = rawHost || reqHostname;
+    return Boolean(target) && originUrl.hostname === target;
+  } catch {
+    return false;
+  }
+}
+
 function originForbidden(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
   if (!origin) {
     return false;
   }
   if (process.env.NODE_ENV === "development") {
+    return false;
+  }
+  if (isSameOriginAsRequest(request, origin)) {
     return false;
   }
   const allowed = parseAllowedOrigins();
