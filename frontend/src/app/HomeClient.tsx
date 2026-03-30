@@ -690,9 +690,9 @@ export default function Home() {
     .pill{background:rgba(200,136,58,.12);border:1px solid rgba(200,136,58,.3);border-radius:var(--r999);padding:7px 11px;font-size:12px}
     .pill strong{font-family:var(--font-display);font-size:11px;margin-right:6px;color:var(--navy2)}
     table{width:100%;border-collapse:collapse}
-    th{font-family:var(--font-display);font-size:8px;text-transform:uppercase;letter-spacing:.35px;background:var(--surface2);color:var(--text2)}
-    th,td{border:1px solid var(--border);padding:6px 8px;text-align:left}
-    td{font-size:8px}
+    th{font-family:var(--font-display);font-size:9px;text-transform:uppercase;letter-spacing:.38px;background:var(--surface2);color:var(--text2)}
+    th,td{border:1px solid var(--border);padding:7px 9px;text-align:left}
+    td{font-size:10px}
     .qty{font-family:var(--font-display);font-size:18px;color:var(--navy2)}
     .empty{color:#7a8fa8;text-align:center;padding:16px}
   </style>
