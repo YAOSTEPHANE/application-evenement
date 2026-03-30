@@ -36,12 +36,14 @@ export function getResolvedApiBaseUrl(): string {
     return base;
   }
   try {
-    const apiUrl = new URL(base);
-    // En HTTPS, on route via Next (rewrites /api/*) lorsque le backend est sur le même hostname.
-    // Ainsi, le navigateur n’appelle jamais directement le backend en HTTP → plus de Mixed Content.
-    if (window.location.protocol === "https:" && apiUrl.hostname === window.location.hostname) {
+    // Mixed Content (production Vercel) : dès que la page est en HTTPS,
+    // on force les appels à passer par le front Next via des chemins relatifs `/api/*`.
+    // Les rewrites Next relaient ensuite vers le backend.
+    if (window.location.protocol === "https:") {
       return "";
     }
+
+    const apiUrl = new URL(base);
     const pageHost = window.location.hostname;
     const apiHost = apiUrl.hostname;
     if (!isLoopbackHost(pageHost) && isLoopbackHost(apiHost)) {
