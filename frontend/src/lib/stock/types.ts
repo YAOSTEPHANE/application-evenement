@@ -45,6 +45,8 @@ export type Movement = {
 
 export type Utilisateur = {
   id: string;
+  /** Identifiant de connexion côté API (sans @). */
+  username?: string | null;
   prenom: string;
   nom: string;
   email: string;

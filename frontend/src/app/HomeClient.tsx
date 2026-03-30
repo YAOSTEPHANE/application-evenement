@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent } from "@/components/MainContent";
@@ -9,22 +10,31 @@ import { ModalConfirm } from "@/components/ModalConfirm";
 import { ModalEvent } from "@/components/ModalEvent";
 import { ModalRetour } from "@/components/ModalRetour";
 import { ModalSortie } from "@/components/ModalSortie";
+import { ModalCategory } from "@/components/ModalCategory";
 import { ModalUser } from "@/components/ModalUser";
 import { Sidebar, type PageId } from "@/components/Sidebar";
 import { Toast } from "@/components/Toast";
 import { Topbar } from "@/components/Topbar";
 import {
+  createCategoryViaApi,
   deleteArticleViaApi,
+  deleteCategoryViaApi,
   deleteEventViaApi,
   deleteUserViaApi,
+  fetchAuthMe,
+  importCatalogueRowsViaApi,
   loadStateFromBackend,
+  getResolvedApiBaseUrl,
   saveAffectationViaApi,
   saveArticleViaApi,
   saveEventViaApi,
   saveRetourViaApi,
   saveSortieViaApi,
+  searchViaApi,
   saveUserViaApi,
   saveProfileViaApi,
+  updateCategoryViaApi,
+  type CategoryWithCount,
 } from "@/lib/stock/api";
 import { getInputValue, getSelectValue } from "@/lib/stock/dom";
 import {
@@ -35,7 +45,14 @@ import {
 } from "@/lib/stock/modalOptions";
 import { globalSearch } from "@/lib/stock/search";
 import { currentUserDisplay, counts } from "@/lib/stock/selectors";
-import { loadState, saveState } from "@/lib/stock/storage";
+import {
+  applySessionToState,
+  clearSession,
+  getPersistedSessionUserId,
+  loadStateWithSession,
+  setSessionUserId,
+} from "@/lib/stock/session";
+import { saveState } from "@/lib/stock/storage";
 import type { ReturnCondition, Role, StockState } from "@/lib/stock/types";
 import { useToast } from "@/lib/stock/useToast";
 
@@ -51,10 +68,19 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export default function Home() {
+  const router = useRouter();
+
   /** Évite l’hydratation sur les champs quand une extension (ex. wfd-id) modifie le DOM. */
   const [clientReady, setClientReady] = useState(false);
 
-  const [state, setState] = useState<StockState>(() => loadState());
+  const [state, setState] = useState<StockState>(() => loadStateWithSession());
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  /** Ignore les réponses d’un chargement API déjà remplacé par un plus récent (Strict Mode, doubles appels). */
+  const refreshApiGenRef = useRef(0);
+  const searchApiTimeoutRef = useRef<number | null>(null);
+  const searchApiGenRef = useRef(0);
+  const lastSearchActionRef = useRef<string>("");
   const [activePage, setActivePage] = useState<PageId>("dashboard");
 
   const [articleModalOpen, setArticleModalOpen] = useState(false);
@@ -63,6 +89,12 @@ export default function Home() {
   const [sortieModalOpen, setSortieModalOpen] = useState(false);
   const [retourModalOpen, setRetourModalOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
+  const [userModalMode, setUserModalMode] = useState<"create" | "edit">("create");
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [categoryModalMode, setCategoryModalMode] = useState<"create" | "edit">("create");
+  const [categoryEditing, setCategoryEditing] = useState<CategoryWithCount | null>(null);
+  const [categoriesReloadToken, setCategoriesReloadToken] = useState(0);
+  const [sessionReady, setSessionReady] = useState(false);
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("Confirmer");
@@ -88,15 +120,81 @@ export default function Home() {
     saveState(state);
   }, [state]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const me = await fetchAuthMe();
+      if (cancelled) {
+        return;
+      }
+      if (!me) {
+        clearSession();
+        router.replace("/connexion");
+        return;
+      }
+      setSessionUserId(me.id);
+      setSessionReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   async function refreshStateFromApi() {
-    const nextState = await loadStateFromBackend(state);
-    setState(nextState);
+    const myGen = ++refreshApiGenRef.current;
+    try {
+      const snapshot = stateRef.current;
+      let nextState = await loadStateFromBackend(snapshot);
+      if (myGen !== refreshApiGenRef.current) {
+        return;
+      }
+      nextState = applySessionToState(nextState);
+      if (myGen !== refreshApiGenRef.current) {
+        return;
+      }
+      setState(nextState);
+      if (!getPersistedSessionUserId()) {
+        router.replace("/connexion");
+      }
+      const me = await fetchAuthMe();
+      if (myGen === refreshApiGenRef.current && !me) {
+        clearSession();
+        router.replace("/connexion");
+        return;
+      }
+      if (nextState.articles.length === 0 && nextState.utilisateurs.length === 0) {
+        showToast(
+          `Aucune donnée côté API. Exécutez une fois : POST ${getResolvedApiBaseUrl()}/api/setup/seed (corps vide), puis rechargez. Vérifiez MongoDB et « prisma db push » sur le backend.`,
+          "default",
+        );
+      }
+    } catch (error) {
+      if (myGen !== refreshApiGenRef.current) {
+        return;
+      }
+      const stillAuthed = await fetchAuthMe();
+      if (!stillAuthed) {
+        clearSession();
+        router.replace("/connexion");
+        return;
+      }
+      console.error("[StockEvent] Échec du chargement API", error);
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Impossible de charger les données. Démarrez le backend (npm run dev:backend, port 3001) ou vérifiez NEXT_PUBLIC_API_BASE_URL.",
+        "danger",
+      );
+    }
   }
 
   useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
     void refreshStateFromApi();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessionReady]);
 
   useEffect(() => {
     setClientReady(true);
@@ -164,16 +262,65 @@ export default function Home() {
   }, [retourModalOpen, articleOptions, eventOptions]);
 
   function runGlobalSearch(query: string) {
-    const result = globalSearch(state, query);
-    if (!query.trim()) {
+    const trimmed = query.trim();
+    if (!trimmed) {
       return;
     }
-    if (!result) {
-      showToast(`Aucun résultat pour "${query}"`, "default");
+    // Évite de déclencher la recherche/navigation pour des requêtes trop courtes.
+    if (trimmed.length < 2) {
       return;
     }
-    setActivePage(result.page);
-    showToast(`Résultat trouvé: ${result.label}`, "default");
+
+    const localResult = globalSearch(state, trimmed);
+    if (localResult) {
+      setActivePage(localResult.page);
+      const key = `${localResult.page}:${localResult.label}`;
+      if (lastSearchActionRef.current !== key) {
+        lastSearchActionRef.current = key;
+        showToast(`Aller vers: ${localResult.label}`, "default");
+      }
+      return;
+    }
+
+    // Fallback : recherche côté API (organisation + DB) si rien en local.
+    // Debounce pour éviter de lancer une requête à chaque frappe.
+    const myGen = ++searchApiGenRef.current;
+    if (searchApiTimeoutRef.current) {
+      window.clearTimeout(searchApiTimeoutRef.current);
+    }
+    searchApiTimeoutRef.current = window.setTimeout(() => {
+      if (myGen !== searchApiGenRef.current) {
+        return;
+      }
+      void (async () => {
+        try {
+          const resp = await searchViaApi(trimmed);
+          const first =
+            resp.items[0]
+              ? { page: "catalogue" as const, label: resp.items[0].name }
+              : resp.events[0]
+                ? { page: "evenements" as const, label: resp.events[0].name }
+                : resp.users[0]
+                  ? { page: "utilisateurs" as const, label: resp.users[0].fullName }
+                  : null;
+
+          if (!first) {
+            return;
+          }
+          setActivePage(first.page);
+          const key = `${first.page}:${first.label}`;
+          if (lastSearchActionRef.current !== key) {
+            lastSearchActionRef.current = key;
+            showToast(`Aller vers: ${first.label}`, "default");
+          }
+        } catch (error) {
+          showToast(
+            error instanceof Error ? error.message : "Recherche impossible",
+            "danger",
+          );
+        }
+      })();
+    }, 300);
   }
 
   function playSuccessBeep(mode: "sortie" | "retour") {
@@ -310,10 +457,15 @@ export default function Home() {
 
   function resetUserForm() {
     setFieldValue("usr-id", "");
+    setFieldValue("usr-username", "");
     setFieldValue("usr-prenom", "");
     setFieldValue("usr-nom", "");
     setFieldValue("usr-email", "");
     setFieldValue("usr-role", "Administrateur");
+    setFieldValue("usr-password", "");
+    setFieldValue("usr-password-confirm", "");
+    setFieldValue("usr-new-password", "");
+    setFieldValue("usr-new-password-confirm", "");
   }
 
   function openEditArticle(articleId: string) {
@@ -361,11 +513,15 @@ export default function Home() {
       showToast("Utilisateur introuvable", "danger");
       return;
     }
+    setUserModalMode("edit");
     setFieldValue("usr-id", user.id);
+    setFieldValue("usr-username", user.username?.trim() || "");
     setFieldValue("usr-prenom", user.prenom);
     setFieldValue("usr-nom", user.nom);
     setFieldValue("usr-email", user.email);
     setFieldValue("usr-role", user.role);
+    setFieldValue("usr-new-password", "");
+    setFieldValue("usr-new-password-confirm", "");
     setUserModalOpen(true);
   }
 
@@ -418,7 +574,14 @@ export default function Home() {
 
       const rows = lines.slice(1).map(parseCsvLine);
       void (async () => {
-        let imported = 0;
+        const payload: Array<{
+          nom: string;
+          ref: string;
+          cat: string;
+          qtyTotal: number;
+          valUnit: number;
+          seuilMin: number;
+        }> = [];
         for (const row of rows) {
           const [
             reference = "",
@@ -433,7 +596,7 @@ export default function Home() {
           if (!designation.trim()) {
             continue;
           }
-          await saveArticleViaApi({
+          payload.push({
             nom: designation.trim(),
             ref: reference.trim(),
             cat: category.trim() || "Autre",
@@ -441,10 +604,10 @@ export default function Home() {
             valUnit: Number.parseFloat(unitValue) || 0,
             seuilMin: Number.parseInt(minThreshold, 10) || 5,
           });
-          imported += 1;
         }
+        const { count } = await importCatalogueRowsViaApi(payload);
         await refreshStateFromApi();
-        showToast(`${imported} article(s) importé(s)`, "ok");
+        showToast(`${count} article(s) importé(s)`, "ok");
       })().catch((error: unknown) => {
         showToast(error instanceof Error ? error.message : "Import impossible", "danger");
       });
@@ -620,8 +783,52 @@ export default function Home() {
     popup.document.close();
   }
 
-  if (!clientReady) {
+  if (!clientReady || !sessionReady) {
     return <div className="app-client-loading">Chargement…</div>;
+  }
+
+  const canManageUsers =
+    state.utilisateurs.find((user) => user.id === state.currentUser)?.role === "Administrateur";
+  const canManageCategories = currentUser.role !== "Lecture seule";
+
+  function openCategoryModal(mode: "create" | "edit", row?: CategoryWithCount) {
+    setCategoryModalMode(mode);
+    setCategoryEditing(row ?? null);
+    setCategoryModalOpen(true);
+  }
+
+  async function submitCategory(payload: { id?: string; name: string; slug: string }) {
+    if (payload.id) {
+      await updateCategoryViaApi(payload.id, { name: payload.name, slug: payload.slug });
+    } else {
+      await createCategoryViaApi({ name: payload.name, slug: payload.slug });
+    }
+    setCategoryModalOpen(false);
+    await refreshStateFromApi();
+    setCategoriesReloadToken((t) => t + 1);
+    showToast("Catégorie enregistrée", "ok");
+  }
+
+  function requestDeleteCategory(row: CategoryWithCount) {
+    if (row.itemCount > 0) {
+      showToast("Impossible : cette catégorie contient encore des articles.", "danger");
+      return;
+    }
+    askConfirm({
+      title: "Supprimer la catégorie",
+      message: `Supprimer « ${row.name} » ?`,
+      label: "Supprimer",
+      onConfirm: async () => {
+        try {
+          await deleteCategoryViaApi(row.id);
+          await refreshStateFromApi();
+          setCategoriesReloadToken((t) => t + 1);
+          showToast("Catégorie supprimée", "ok");
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+        }
+      },
+    });
   }
 
   return (
@@ -668,8 +875,14 @@ export default function Home() {
         }}
         onOpenUserModal={() => {
           resetUserForm();
+          setUserModalMode("create");
           setUserModalOpen(true);
         }}
+        canManageUsers={canManageUsers}
+        canManageCategories={canManageCategories}
+        categoriesReloadToken={categoriesReloadToken}
+        onOpenCategoryModal={openCategoryModal}
+        onRequestDeleteCategory={requestDeleteCategory}
         onEditArticle={openEditArticle}
         onEditEvent={openEditEvent}
         onEditUser={openEditUser}
@@ -818,6 +1031,23 @@ export default function Home() {
         soundEnabled={soundEnabled}
         onToggleSound={toggleSound}
       />
+      <ModalCategory
+        isOpen={categoryModalOpen}
+        mode={categoryModalMode}
+        initial={
+          categoryEditing
+            ? { id: categoryEditing.id, name: categoryEditing.name, slug: categoryEditing.slug }
+            : null
+        }
+        onClose={() => setCategoryModalOpen(false)}
+        onSubmit={async (payload) => {
+          try {
+            await submitCategory(payload);
+          } catch (error) {
+            showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+          }
+        }}
+      />
       <ModalArticle
         isOpen={articleModalOpen}
         onClose={() => setArticleModalOpen(false)}
@@ -923,15 +1153,73 @@ export default function Home() {
       />
       <ModalUser
         isOpen={userModalOpen}
+        mode={userModalMode}
         onClose={() => setUserModalOpen(false)}
         onSave={async () => {
           try {
+            const username = getInputValue("usr-username").trim().toLowerCase();
+            if (username.length < 2) {
+              showToast("Le nom d’utilisateur doit contenir au moins 2 caractères.", "danger");
+              return;
+            }
+            if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+              showToast(
+                "Nom d’utilisateur : lettres, chiffres, point, tiret ou underscore uniquement.",
+                "danger",
+              );
+              return;
+            }
+            const id = getInputValue("usr-id") || undefined;
+            const prenom = getInputValue("usr-prenom");
+            const nom = getInputValue("usr-nom");
+            const email = getInputValue("usr-email");
+            const role = (getSelectValue("usr-role") || "Administrateur") as Role;
+
+            if (!id) {
+              const password = getInputValue("usr-password");
+              const passwordConfirm = getInputValue("usr-password-confirm");
+              if (password.length < 8) {
+                showToast("Le mot de passe doit contenir au moins 8 caractères.", "danger");
+                return;
+              }
+              if (password !== passwordConfirm) {
+                showToast("Les mots de passe ne correspondent pas.", "danger");
+                return;
+              }
+              const message = await saveUserViaApi({
+                username,
+                prenom,
+                nom,
+                email,
+                role,
+                password,
+              });
+              await refreshStateFromApi();
+              showToast(message, "ok");
+              setUserModalOpen(false);
+              return;
+            }
+
+            const newPw = getInputValue("usr-new-password");
+            const newPwConfirm = getInputValue("usr-new-password-confirm");
+            if (newPw || newPwConfirm) {
+              if (newPw.length < 8) {
+                showToast("Le nouveau mot de passe doit contenir au moins 8 caractères.", "danger");
+                return;
+              }
+              if (newPw !== newPwConfirm) {
+                showToast("Les nouveaux mots de passe ne correspondent pas.", "danger");
+                return;
+              }
+            }
             const message = await saveUserViaApi({
-              id: getInputValue("usr-id") || undefined,
-              prenom: getInputValue("usr-prenom"),
-              nom: getInputValue("usr-nom"),
-              email: getInputValue("usr-email"),
-              role: (getSelectValue("usr-role") || "Administrateur") as Role,
+              id,
+              username,
+              prenom,
+              nom,
+              email,
+              role,
+              newPassword: newPw.length > 0 ? newPw : undefined,
             });
             await refreshStateFromApi();
             showToast(message, "ok");

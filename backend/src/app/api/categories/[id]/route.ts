@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
 
@@ -11,9 +12,35 @@ const updateCategorySchema = z.object({
   slug: z.string().min(2).optional(),
 });
 
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
+    const { organizationId } = await getRequestContext();
+
+    const category = await prisma.category.findFirst({
+      where: { id, organizationId },
+      include: { _count: { select: { items: true } } },
+    });
+
+    if (!category) {
+      return NextResponse.json({ message: "Catégorie introuvable" }, { status: 404 });
+    }
+
+    return NextResponse.json(category);
+  } catch {
+    return NextResponse.json({ message: "Impossible de charger la catégorie" }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
     const body = await request.json();
     const payload = updateCategorySchema.parse(body);
     const { organizationId } = await getRequestContext();
@@ -49,6 +76,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
     const { organizationId } = await getRequestContext();
 
     const existing = await prisma.category.findFirst({

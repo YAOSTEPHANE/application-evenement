@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
+
+const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
 const createEventSchema = z.object({
   name: z.string().min(2),
@@ -10,11 +13,11 @@ const createEventSchema = z.object({
   clientName: z.string().min(2),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
-  ownerId: z.string().min(10),
+  ownerId: objectId,
   allocations: z
     .array(
       z.object({
-        itemId: z.string().min(10),
+        itemId: objectId,
         quantity: z.number().int().positive(),
       })
     )

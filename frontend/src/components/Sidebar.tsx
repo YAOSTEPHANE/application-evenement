@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 export type PageId =
   | "dashboard"
   | "catalogue"
+  | "categories"
   | "evenements"
   | "mouvements"
   | "rapports"
@@ -48,6 +50,7 @@ export function Sidebar({
     () =>
       activePage === "mouvements" ||
       activePage === "rapports" ||
+      activePage === "categories" ||
       activePage === "utilisateurs" ||
       activePage === "profil",
     [activePage],
@@ -117,6 +120,13 @@ export function Sidebar({
           </span>
         </div>
 
+        <div className={itemClass("categories")} onClick={() => goTo("categories")}>
+          <span className="nav-icon" aria-hidden="true">
+            ▤
+          </span>
+          Catégories
+        </div>
+
         <div className={itemClass("evenements")} onClick={() => goTo("evenements")}>
           <span className="nav-icon" aria-hidden="true">
             ◈
@@ -140,7 +150,7 @@ export function Sidebar({
           <span className="nav-icon" aria-hidden="true">
             ▦
           </span>
-          Rapports
+          Analytique
         </div>
 
         <div className={itemClass("alertes")} onClick={() => goTo("alertes")}>
@@ -175,6 +185,21 @@ export function Sidebar({
           </span>
           Mon profil
         </div>
+
+        <Link
+          href="/deconnexion"
+          className="nav-item nav-item-logout"
+          prefetch={false}
+          onClick={() => {
+            setMobileMoreOpen(false);
+            setMobileMoreClosing(false);
+          }}
+        >
+          <span className="nav-icon" aria-hidden="true">
+            ⎋
+          </span>
+          Déconnexion
+        </Link>
 
         <div className="sidebar-foot">
           <div className="foot-user" onClick={() => goTo("profil")} role="button" tabIndex={0}>
@@ -248,9 +273,13 @@ export function Sidebar({
               <span className="nav-icon" aria-hidden="true">⇄</span>
               <span>Mouvements</span>
             </button>
+            <button type="button" className={mobileItemClass("categories")} onClick={() => goTo("categories")}>
+              <span className="nav-icon" aria-hidden="true">▤</span>
+              <span>Catégories</span>
+            </button>
             <button type="button" className={mobileItemClass("rapports")} onClick={() => goTo("rapports")}>
               <span className="nav-icon" aria-hidden="true">▦</span>
-              <span>Rapports</span>
+              <span>Analytique</span>
             </button>
             <button type="button" className={mobileItemClass("utilisateurs")} onClick={() => goTo("utilisateurs")}>
               <span className="nav-icon" aria-hidden="true">◎</span>
@@ -260,6 +289,15 @@ export function Sidebar({
               <span className="nav-icon" aria-hidden="true">☺</span>
               <span>Mon profil</span>
             </button>
+            <Link
+              href="/deconnexion"
+              className="mobile-nav-item"
+              prefetch={false}
+              onClick={closeMobileMore}
+            >
+              <span className="nav-icon" aria-hidden="true">⎋</span>
+              <span>Déconnexion</span>
+            </Link>
           </div>
         </>
       ) : null}

@@ -1,10 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AnalyticsRapports } from "@/components/AnalyticsRapports";
+import {
+  fetchAuditLogsFromApi,
+  fetchCategoriesWithCounts,
+  fetchDashboardFromApi,
+  type CategoryWithCount,
+  type DashboardResponse,
+} from "@/lib/stock/api";
 import { dispo, fmt, fmtNum, fmtTime } from "@/lib/stock/helpers";
 import type { Evenement, StockState } from "@/lib/stock/types";
+import type { AuditLogsResponse } from "@/lib/stock/api";
 
 import type { PageId } from "./Sidebar";
 
@@ -18,6 +27,13 @@ type MainContentProps = {
   onOpenSortieModal: () => void;
   onOpenRetourModal: () => void;
   onOpenUserModal: () => void;
+  /** Réservé aux administrateurs : création / édition / suppression d’utilisateurs. */
+  canManageUsers: boolean;
+  /** Hors « Lecture seule » : CRUD catégories. */
+  canManageCategories: boolean;
+  categoriesReloadToken: number;
+  onOpenCategoryModal: (mode: "create" | "edit", row?: CategoryWithCount) => void;
+  onRequestDeleteCategory: (row: CategoryWithCount) => void;
   onDeleteArticle: (articleId: string) => void;
   onDeleteEvent: (eventId: string) => void;
   onDeleteUser: (userId: string) => void;
@@ -84,15 +100,6 @@ const DEFAULT_CATEGORIES = [
   "Éclairage",
   "Autre",
 ];
-const REPARTITION_TONE_CLASSES = [
-  "repartition-tone-info",
-  "repartition-tone-warn",
-  "repartition-tone-ok",
-  "repartition-tone-surface",
-  "repartition-tone-danger",
-  "repartition-tone-navy",
-];
-
 export function MainContent({
   activePage,
   state,
@@ -103,6 +110,11 @@ export function MainContent({
   onOpenSortieModal,
   onOpenRetourModal,
   onOpenUserModal,
+  canManageUsers,
+  canManageCategories,
+  categoriesReloadToken,
+  onOpenCategoryModal,
+  onRequestDeleteCategory,
   onDeleteArticle,
   onDeleteEvent,
   onDeleteUser,
@@ -128,6 +140,104 @@ export function MainContent({
   const [movementFilter, setMovementFilter] = useState("");
   const [profileAvatarDataUrl, setProfileAvatarDataUrl] = useState("");
   const [calendarCursor, setCalendarCursor] = useState(() => new Date(state.calYear, state.calMonth, 1));
+
+  const AUDIT_TAKE = 10;
+  const [auditLogs, setAuditLogs] = useState<AuditLogsResponse["logs"]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditSkip, setAuditSkip] = useState(0);
+  const [auditTotal, setAuditTotal] = useState<number | null>(null);
+  const [dashData, setDashData] = useState<DashboardResponse | null>(null);
+  const [dashLoading, setDashLoading] = useState(false);
+  const [dashErr, setDashErr] = useState<string | null>(null);
+  const [categoryRows, setCategoryRows] = useState<CategoryWithCount[]>([]);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+
+  const auditHasMore = auditTotal != null && auditLogs.length < auditTotal;
+
+  const loadAuditLogs = useCallback(
+    async (opts: { skip: number; replace: boolean }) => {
+      setAuditLoading(true);
+      setAuditError(null);
+      try {
+        const resp = await fetchAuditLogsFromApi({ take: AUDIT_TAKE, skip: opts.skip });
+        setAuditTotal(resp.total);
+        setAuditSkip(opts.skip + resp.take);
+        setAuditLogs((prev) => (opts.replace ? resp.logs : [...prev, ...resp.logs]));
+      } catch (err) {
+        setAuditError(err instanceof Error ? err.message : "Impossible de charger le journal");
+      } finally {
+        setAuditLoading(false);
+      }
+    },
+    [AUDIT_TAKE],
+  );
+
+  useEffect(() => {
+    if (activePage !== "rapports") {
+      return;
+    }
+    void loadAuditLogs({ skip: 0, replace: true });
+  }, [activePage, loadAuditLogs]);
+
+  useEffect(() => {
+    if (activePage !== "rapports") {
+      return;
+    }
+    let cancel = false;
+    setDashLoading(true);
+    setDashErr(null);
+    void fetchDashboardFromApi()
+      .then((d) => {
+        if (!cancel) {
+          setDashData(d);
+        }
+      })
+      .catch((e) => {
+        if (!cancel) {
+          setDashErr(e instanceof Error ? e.message : "Données analytiques indisponibles");
+          setDashData(null);
+        }
+      })
+      .finally(() => {
+        if (!cancel) {
+          setDashLoading(false);
+        }
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [activePage]);
+
+  useEffect(() => {
+    if (activePage !== "categories") {
+      return;
+    }
+    let cancel = false;
+    setCategoryLoading(true);
+    setCategoryError(null);
+    void fetchCategoriesWithCounts()
+      .then((rows) => {
+        if (!cancel) {
+          setCategoryRows(rows);
+        }
+      })
+      .catch((e) => {
+        if (!cancel) {
+          setCategoryError(e instanceof Error ? e.message : "Impossible de charger les catégories");
+          setCategoryRows([]);
+        }
+      })
+      .finally(() => {
+        if (!cancel) {
+          setCategoryLoading(false);
+        }
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [activePage, categoriesReloadToken]);
 
   const activeEvents = state.evenements.filter((event) => event.statut !== "Terminé" && event.statut !== "Annulé");
   const alerts = state.articles.filter((article) => dispo(article) <= article.seuilMin);
@@ -506,6 +616,9 @@ export function MainContent({
             <div className="ph-sub">{state.articles.length} article(s)</div>
           </div>
           <div className="ph-actions">
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => onNavigate("categories")}>
+              ▤ Catégories
+            </button>
             <button className="btn btn-outline btn-sm" type="button" onClick={openCsvPicker}>
               ↑ Import CSV
             </button>
@@ -604,6 +717,90 @@ export function MainContent({
               </button>
             </div>
           ) : null}
+        </div>
+      </div>
+
+      <div id="page-categories" className={pageClass(activePage, "categories")}>
+        <div className="ph">
+          <div className="ph-left">
+            <div className="ph-title">Catégories</div>
+            <div className="ph-sub">Référentiel utilisé par le catalogue et les analyses</div>
+          </div>
+          <div className="ph-actions">
+            {canManageCategories ? (
+              <button className="btn btn-gold" type="button" onClick={() => onOpenCategoryModal("create")}>
+                + Nouvelle catégorie
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <div className="card card-pad cat-admin-card">
+          {categoryLoading ? (
+            <div className="fs12 fc-3">Chargement des catégories…</div>
+          ) : categoryError ? (
+            <div className="auth-error" role="alert">
+              {categoryError}
+            </div>
+          ) : categoryRows.length === 0 ? (
+            <div className="empty-state cat-admin-empty">
+              <div className="empty-icon">▤</div>
+              <h3>Aucune catégorie</h3>
+              <p>Créez une catégorie pour classer vos articles.</p>
+              {canManageCategories ? (
+                <button className="btn btn-gold mt8" type="button" onClick={() => onOpenCategoryModal("create")}>
+                  + Créer une catégorie
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Slug</th>
+                    <th>Articles</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <strong>{row.name}</strong>
+                      </td>
+                      <td className="fs12 fc-3 mono">{row.slug}</td>
+                      <td>{fmtNum(row.itemCount)}</td>
+                      <td>
+                        {canManageCategories ? (
+                          <div className="row-actions">
+                            <button
+                              className="btn btn-outline btn-xs"
+                              type="button"
+                              onClick={() => onOpenCategoryModal("edit", row)}
+                            >
+                              Modifier
+                            </button>{" "}
+                            <button
+                              className="btn btn-danger btn-xs"
+                              type="button"
+                              onClick={() => onRequestDeleteCategory(row)}
+                              disabled={row.itemCount > 0}
+                              title={row.itemCount > 0 ? "Détachez d’abord les articles de cette catégorie" : undefined}
+                            >
+                              Suppr.
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="fs12 fc-3">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -862,135 +1059,24 @@ export function MainContent({
         </div>
       </div>
 
-      <div id="page-rapports" className={pageClass(activePage, "rapports")}>
-        <div className="ph">
-          <div className="ph-left">
-            <div className="ph-title">Rapports &amp; Analyses</div>
-            <div className="ph-sub" id="rapport-sub" />
-          </div>
-          <div className="ph-actions">
-            <button className="btn btn-outline" type="button" onClick={onPrintReport}>
-              ↓ Imprimer
-            </button>
-          </div>
-        </div>
-        <div className="metrics">
-          <div className="mc mc-navy">
-            <div className="mc-accent" />
-            <div className="mc-label">Total sorties</div>
-            <div className="mc-value" id="r-sorties">
-              {fmtNum(reportStats.totalSorties)}
-            </div>
-            <div className="mc-sub">articles sortis</div>
-          </div>
-          <div className="mc mc-ok">
-            <div className="mc-accent" />
-            <div className="mc-label">Total retours</div>
-            <div className="mc-value" id="r-retours">
-              {fmtNum(reportStats.totalRetours)}
-            </div>
-            <div className="mc-sub">articles retournés</div>
-          </div>
-          <div className="mc mc-warn">
-            <div className="mc-accent" />
-            <div className="mc-label">Pertes / dommages</div>
-            <div className="mc-value" id="r-pertes">
-              {fmtNum(reportStats.totalPertes)}
-            </div>
-            <div className="mc-sub">articles affectés</div>
-          </div>
-          <div className="mc mc-gold">
-            <div className="mc-accent" />
-            <div className="mc-label">Valeur du stock</div>
-            <div className="mc-value" id="r-valeur">
-              {fmtNum(stockValue)}
-            </div>
-            <div className="mc-sub">F CFA estimés</div>
-          </div>
-        </div>
-        <div className="grid-2 gap18">
-          <div className="card card-pad">
-            <div className="card-title">
-              <h3>Articles les plus utilisés</h3>
-            </div>
-            <div id="r-top-articles">
-              {reportStats.topArticles.length === 0 ? (
-                <div className="fs12 fc-3">Aucune sortie enregistrée</div>
-              ) : (
-                reportStats.topArticles.map((item) => (
-                  <div key={item.id} className="mb12">
-                    <div className="stat-bar">
-                      <span>{item.article?.emoji || "📦"} {item.article?.nom}</span>
-                      <span>{fmtNum(item.qty)}</span>
-                    </div>
-                    <progress
-                      className="progress-meter progress-meter-info"
-                      value={item.qty}
-                      max={Math.max(1, reportStats.topArticles[0]?.qty ?? 1)}
-                    />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-          <div className="card card-pad">
-            <div className="card-title">
-              <h3>Répartition par catégorie</h3>
-            </div>
-            <div id="r-cat-repartition">
-              {Object.entries(reportStats.categoryDistribution).map(([category, total], index) => {
-                const totalAll = Math.max(1, state.articles.length);
-                const pct = Math.round((total / totalAll) * 100);
-                const toneClass = REPARTITION_TONE_CLASSES[index % REPARTITION_TONE_CLASSES.length];
-                return (
-                  <div key={category} className={`repartition-item ${toneClass}`}>
-                    <span>{category}</span>
-                    <strong>{pct}% ({total})</strong>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <div className="card card-pad mt14">
-          <div className="card-title">
-            <h3>Historique des événements</h3>
-          </div>
-          <div id="r-events-history">
-            <div className="tbl-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Événement</th>
-                    <th>Client</th>
-                    <th>Date</th>
-                    <th>Articles sortis</th>
-                    <th>Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.evenements.map((event) => (
-                    <tr key={event.id}>
-                      <td>{event.nom}</td>
-                      <td>{event.client || "—"}</td>
-                      <td>{event.debut ? fmt(event.debut) : "—"}</td>
-                      <td>
-                        {fmtNum(
-                          state.mouvements
-                            .filter((movement) => movement.evId === event.id && movement.type === "Sortie")
-                            .reduce((sum, movement) => sum + movement.qty, 0),
-                        )}
-                      </td>
-                      <td>
-                        <span className={`badge ${eventStatusClass[event.statut] ?? "badge-gray"}`}>{event.statut}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+      <div id="page-rapports" className={`${pageClass(activePage, "rapports")} page-analytics`}>
+        <AnalyticsRapports
+          dashboard={dashData}
+          dashboardLoading={dashLoading}
+          dashboardError={dashErr}
+          reportStats={reportStats}
+          stockValue={stockValue}
+          state={state}
+          eventStatusClass={eventStatusClass}
+          onNavigate={onNavigate}
+          onPrintReport={onPrintReport}
+          auditLogs={auditLogs}
+          auditLoading={auditLoading}
+          auditError={auditError}
+          auditHasMore={auditHasMore}
+          auditSkip={auditSkip}
+          loadAuditLogs={loadAuditLogs}
+        />
       </div>
 
       <div id="page-alertes" className={pageClass(activePage, "alertes")}>
@@ -1318,9 +1404,11 @@ export function MainContent({
             <div className="ph-sub">{state.utilisateurs.length} utilisateur(s)</div>
           </div>
           <div className="ph-actions">
-            <button className="btn btn-gold" type="button" onClick={onOpenUserModal}>
-              + Ajouter utilisateur
-            </button>
+            {canManageUsers ? (
+              <button className="btn btn-gold" type="button" onClick={onOpenUserModal}>
+                + Ajouter utilisateur
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="card card-overflow-hidden">
@@ -1329,6 +1417,7 @@ export function MainContent({
               <thead>
                 <tr>
                   <th>Utilisateur</th>
+                  <th>Identifiant</th>
                   <th>Email</th>
                   <th>Rôle</th>
                   <th>Dernière action</th>
@@ -1351,19 +1440,24 @@ export function MainContent({
                         </div>
                       </div>
                     </td>
+                    <td className="fc-3 fs12">{user.username ?? "—"}</td>
                     <td className="fc-3 fs12">{user.email}</td>
                     <td><span className={`badge ${roleBadgeClass[user.role] ?? "badge-gray"}`}>{user.role}</span></td>
                     <td>—</td>
                     <td><span className={`badge ${user.actif ? "badge-ok" : "badge-gray"}`}>{user.actif ? "Actif" : "Inactif"}</span></td>
                     <td>
-                      <div className="row-actions">
-                        <button className="btn btn-outline btn-xs" type="button" onClick={() => onEditUser(user.id)}>
-                          Modif.
-                        </button>{" "}
-                        <button className="btn btn-danger btn-xs" type="button" onClick={() => onDeleteUser(user.id)}>
-                          Suppr.
-                        </button>
-                      </div>
+                      {canManageUsers ? (
+                        <div className="row-actions">
+                          <button className="btn btn-outline btn-xs" type="button" onClick={() => onEditUser(user.id)}>
+                            Modif.
+                          </button>{" "}
+                          <button className="btn btn-danger btn-xs" type="button" onClick={() => onDeleteUser(user.id)}>
+                            Suppr.
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="fc-3 fs12">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
+
+const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
 const createItemSchema = z.object({
   name: z.string().min(2),
   reference: z.string().min(2),
-  categoryId: z.string().min(10),
+  categoryId: objectId,
   unitValue: z.number().nonnegative(),
   totalQuantity: z.number().int().positive(),
   minThreshold: z.number().int().nonnegative().default(0),
@@ -19,7 +22,23 @@ export async function GET() {
 
   const items = await prisma.item.findMany({
     where: { organizationId },
-    include: { category: true },
+    // On évite de résoudre la relation `category` car certaines données peuvent être incohérentes
+    // (Prisma: "Inconsistent query result: Field category is required... got null").
+    // Le frontend récupère ensuite le nom via GET /api/categories + categoryId.
+    select: {
+      id: true,
+      name: true,
+      reference: true,
+      photoUrl: true,
+      unitValue: true,
+      totalQuantity: true,
+      availableQty: true,
+      allocatedQty: true,
+      minThreshold: true,
+      categoryId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 

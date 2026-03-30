@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
 
 type RouteParams = { params: Promise<{ id: string }> };
+
+const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
 const updateEventSchema = z.object({
   name: z.string().min(2).optional(),
@@ -12,12 +15,45 @@ const updateEventSchema = z.object({
   clientName: z.string().min(2).optional(),
   startsAt: z.coerce.date().optional(),
   endsAt: z.coerce.date().optional(),
-  ownerId: z.string().min(10).optional(),
+  ownerId: objectId.optional(),
 });
+
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
+    const { organizationId } = await getRequestContext();
+
+    const event = await prisma.event.findFirst({
+      where: { id, organizationId },
+      include: {
+        owner: { select: { id: true, fullName: true, email: true, role: true } },
+        eventItems: {
+          include: {
+            item: { select: { id: true, name: true, reference: true, availableQty: true, totalQuantity: true } },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return NextResponse.json({ message: "Événement introuvable" }, { status: 404 });
+    }
+
+    return NextResponse.json(event);
+  } catch {
+    return NextResponse.json({ message: "Impossible de charger l'événement" }, { status: 500 });
+  }
+}
 
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
     const body = await request.json();
     const payload = updateEventSchema.parse(body);
     const { organizationId } = await getRequestContext();
@@ -66,6 +102,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
     const { organizationId } = await getRequestContext();
 
     const existing = await prisma.event.findFirst({

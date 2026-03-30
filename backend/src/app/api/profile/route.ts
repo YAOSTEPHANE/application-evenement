@@ -16,8 +16,20 @@ const updateProfileSchema = z.object({
 export async function GET() {
   const { organizationId, actorId } = await getRequestContext();
 
+  if (!actorId) {
+    return NextResponse.json({ message: "Non authentifié." }, { status: 401 });
+  }
+
   const profile = await prisma.user.findFirst({
     where: { id: actorId, organizationId },
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      email: true,
+      role: true,
+      avatarUrl: true,
+    },
   });
 
   if (!profile) {
@@ -26,6 +38,7 @@ export async function GET() {
 
   return NextResponse.json({
     id: profile.id,
+    username: profile.username,
     fullName: profile.fullName,
     email: profile.email,
     role: profile.role,
@@ -38,6 +51,10 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const payload = updateProfileSchema.parse(body);
     const { organizationId, actorId } = await getRequestContext();
+
+    if (!actorId) {
+      return NextResponse.json({ message: "Non authentifié." }, { status: 401 });
+    }
 
     const existing = await prisma.user.findFirst({
       where: { id: actorId, organizationId },

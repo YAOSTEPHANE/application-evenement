@@ -2,15 +2,18 @@ import { ItemStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
+
 const updateItemSchema = z.object({
   name: z.string().min(2).optional(),
   reference: z.string().min(2).optional(),
-  categoryId: z.string().min(10).optional(),
+  categoryId: objectId.optional(),
   photoUrl: z.url().optional().nullable(),
   unitValue: z.number().nonnegative().optional(),
   totalQuantity: z.number().int().nonnegative().optional(),
@@ -18,9 +21,53 @@ const updateItemSchema = z.object({
   status: z.nativeEnum(ItemStatus).optional(),
 });
 
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
+    const { organizationId } = await getRequestContext();
+
+    const item = await prisma.item.findFirst({
+      where: { id, organizationId },
+      // Évite de résoudre la relation `category` (voir GET /api/items).
+      select: {
+        id: true,
+        name: true,
+        reference: true,
+        photoUrl: true,
+        unitValue: true,
+        totalQuantity: true,
+        availableQty: true,
+        allocatedQty: true,
+        minThreshold: true,
+        status: true,
+        categoryId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!item) {
+      return NextResponse.json({ message: "Article introuvable" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      ...item,
+      isCritical: item.availableQty <= item.minThreshold,
+    });
+  } catch {
+    return NextResponse.json({ message: "Impossible de charger l'article" }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
     const body = await request.json();
     const payload = updateItemSchema.parse(body);
     const { organizationId } = await getRequestContext();
@@ -78,6 +125,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    if (!isValidMongoObjectId(id)) {
+      return jsonInvalidObjectIdResponse();
+    }
     const { organizationId } = await getRequestContext();
 
     const existing = await prisma.item.findFirst({

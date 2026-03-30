@@ -2,13 +2,16 @@ import { MovementType, ReturnCondition } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
 
+const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
+
 const createMovementSchema = z.object({
   movementType: z.nativeEnum(MovementType),
-  itemId: z.string().min(10),
-  eventId: z.string().min(10).optional(),
+  itemId: objectId,
+  eventId: objectId.optional(),
   quantity: z.number().int().positive(),
   returnCondition: z.nativeEnum(ReturnCondition).optional(),
   notes: z.string().max(500).optional(),
