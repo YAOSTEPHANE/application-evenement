@@ -1,7 +1,26 @@
 import path from "path";
 import type { NextConfig } from "next";
 
+const prismaClientAlias = path.resolve(__dirname, ".prisma-generated");
+
 const nextConfig: NextConfig = {
+  // Client Prisma généré hors node_modules (voir prisma/schema.prisma) — alias pour Webpack et Turbopack.
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        "@prisma/client": prismaClientAlias,
+      },
+    },
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "@prisma/client": prismaClientAlias,
+      };
+    }
+    return config;
+  },
   // Les navigateurs demandent /favicon.ico par défaut. Une redirection 302 peut encore apparaître en « 404 »
   // selon l’outil réseau ; une réécriture interne renvoie le SVG avec un 200 sur /favicon.ico.
   async rewrites() {
@@ -11,14 +30,25 @@ const nextConfig: NextConfig = {
     ];
 
     // Proxification des appels front->backend pour éviter le Mixed Content en prod.
-    // Le navigateur appelle Next en HTTPS, Next relaye vers le backend (même si le backend est en HTTP).
+    // Ne pas réécrire vers la même origine que ce déploiement (404 sur /api/*).
+    // VERCEL_URL = URL du déploiement courant (preview ou prod).
     if (apiBase) {
       try {
         const apiUrl = new URL(apiBase);
-        rewrites.push({
-          source: "/api/:path*",
-          destination: `${apiUrl.origin}/api/:path*`,
-        });
+        const apiOrigin = apiUrl.origin;
+        const deployOrigin = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
+        const prodOrigin = process.env.VERCEL_PROJECT_PRODUCTION_URL
+          ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+          : null;
+        const sameAsDeploy =
+          (deployOrigin && apiOrigin === new URL(deployOrigin).origin) ||
+          (prodOrigin && apiOrigin === new URL(prodOrigin).origin);
+        if (!sameAsDeploy) {
+          rewrites.push({
+            source: "/api/:path*",
+            destination: `${apiOrigin}/api/:path*`,
+          });
+        }
       } catch {
         // URL invalide : on garde uniquement la rewrite favicon.
       }
@@ -31,6 +61,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
   // Binaires natifs Tailwind 4 / lightningcss : ne pas les bundler via le hook require de Next.
   serverExternalPackages: [
+    "@prisma/client",
+    "prisma",
     "@tailwindcss/postcss",
     "@tailwindcss/node",
     "@tailwindcss/oxide",

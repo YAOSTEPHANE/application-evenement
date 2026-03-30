@@ -1,0 +1,135 @@
+import { jwtVerify } from "jose";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+
+import { getJwtSecretKey, SESSION_COOKIE_NAME } from "@/lib/session-token";
+
+/**
+ * Next.js détecte `middleware.ts` et `proxy.ts` comme deux façons concurrentes de faire du “edge handling”.
+ * On garde donc `proxy.ts` uniquement, en y mettant toute la logique (auth + CORS).
+ */
+
+function parseAllowedOrigins(): string[] {
+  const raw = process.env.CORS_ALLOWED_ORIGINS?.trim();
+  if (raw) {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return ["http://localhost:3000", "http://127.0.0.1:3000"];
+}
+
+function applyApiCors(request: NextRequest, response: NextResponse): NextResponse {
+  const origin = request.headers.get("origin");
+  const allowed = parseAllowedOrigins();
+
+  const allowOrigin =
+    process.env.NODE_ENV === "development" && origin
+      ? origin
+      : origin && allowed.includes(origin)
+        ? origin
+        : undefined;
+
+  if (allowOrigin) {
+    response.headers.set("Access-Control-Allow-Origin", allowOrigin);
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, x-organization-id, x-actor-id, Cookie",
+  );
+  response.headers.set("Access-Control-Max-Age", "86400");
+
+  return response;
+}
+
+function originForbidden(request: NextRequest): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) {
+    return false;
+  }
+  if (process.env.NODE_ENV === "development") {
+    return false;
+  }
+  const allowed = parseAllowedOrigins();
+  return allowed.length > 0 && !allowed.includes(origin);
+}
+
+function isPublicApiPath(pathname: string): boolean {
+  if (pathname === "/api/auth/login") return true;
+  if (pathname === "/api/auth/logout") return true;
+  if (pathname === "/api/health") return true;
+  if (pathname.startsWith("/api/setup/seed")) return true;
+  return false;
+}
+
+function legacyHeadersAllowed(request: NextRequest): boolean {
+  if (process.env.NODE_ENV === "production") {
+    return process.env.ALLOW_LEGACY_API_HEADERS === "true";
+  }
+  return process.env.ALLOW_LEGACY_API_HEADERS !== "false";
+}
+
+async function hasValidSession(request: NextRequest): Promise<boolean> {
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (!token) {
+    return false;
+  }
+  try {
+    await jwtVerify(token, getJwtSecretKey(), { algorithms: ["HS256"] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (!pathname.startsWith("/api")) {
+    return NextResponse.next();
+  }
+
+  if (request.method === "OPTIONS") {
+    if (originForbidden(request)) {
+      return new NextResponse(null, { status: 403 });
+    }
+    const res = new NextResponse(null, { status: 204 });
+    return applyApiCors(request, res);
+  }
+
+  if (originForbidden(request)) {
+    const res = NextResponse.json(
+      { message: "Origine non autorisée (CORS)" },
+      { status: 403 },
+    );
+    return applyApiCors(request, res);
+  }
+
+  let res: NextResponse;
+  if (isPublicApiPath(pathname)) {
+    res = NextResponse.next();
+  } else {
+    const okSession = await hasValidSession(request);
+    const okLegacy =
+      legacyHeadersAllowed(request) && Boolean(request.headers.get("x-actor-id"));
+
+    if (okSession || okLegacy) {
+      res = NextResponse.next();
+    } else {
+      res = NextResponse.json({ message: "Non authentifié." }, { status: 401 });
+    }
+  }
+
+  return applyApiCors(request, res);
+}
+
+export const config = {
+  matcher: "/api/:path*",
+};

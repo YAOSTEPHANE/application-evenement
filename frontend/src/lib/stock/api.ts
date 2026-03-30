@@ -9,7 +9,9 @@ import type { Role, ReturnCondition, StockState } from "./types";
 function getEnvApiBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (!raw) {
-    return "http://localhost:3001";
+    // Monolithe Next (API sous /api dans la même app) : fetch relatifs.
+    // Pour un backend séparé en local : définir NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+    return "";
   }
   return raw.replace(/\/+$/, "");
 }
@@ -34,6 +36,9 @@ export function getResolvedApiBaseUrl(): string {
   let base = getEnvApiBaseUrl();
   if (typeof window === "undefined") {
     return base;
+  }
+  if (!base) {
+    return "";
   }
   try {
     // En HTTPS, on évite le mixed-content uniquement si l'API cible est en HTTP.
@@ -72,6 +77,31 @@ export function getResolvedApiBaseUrl(): string {
     // URL invalide : on garde la valeur d’env
   }
   return base;
+}
+
+/** Pour les messages (toasts) : URL de base affichable quand l’API est sur la même origine. */
+export function getApiOriginForDisplay(): string {
+  const b = getResolvedApiBaseUrl();
+  if (b) {
+    return b;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "";
+}
+
+/** URL absolue pour fetch : évite les chemins relatifs mal résolus (ex. /connexion/api/... → 404). */
+function resolveApiUrl(path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  const base = getResolvedApiBaseUrl();
+  if (!base) {
+    if (typeof window !== "undefined") {
+      return new URL(normalized, window.location.origin).href;
+    }
+    return normalized;
+  }
+  return `${base.replace(/\/+$/, "")}${normalized}`;
 }
 
 type BackendUserRole = "ADMIN" | "MANAGER" | "STOREKEEPER" | "VIEWER";
@@ -134,10 +164,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const apiBase = getResolvedApiBaseUrl();
+  const url = resolveApiUrl(path);
 
   let response: Response;
   try {
-    response = await fetch(`${apiBase}${path}`, {
+    response = await fetch(url, {
       ...init,
       credentials: "include",
       headers,
@@ -149,8 +180,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       const hint = fromNetwork
         ? ` Vous êtes sur ${window.location.host} : l’API doit être joignable à cette adresse (ex. ${window.location.protocol}//${window.location.hostname}:3001). Vérifiez aussi que le backend écoute sur toutes les interfaces, pas seulement 127.0.0.1.`
         : "";
+      const baseHint = apiBase
+        ? ` Démarrez le backend (npm run dev:backend, port 3001) et contrôlez NEXT_PUBLIC_API_BASE_URL.`
+        : ` Lancez l’app Next (npm run dev dans frontend) : les routes /api sont dans la même app. Vérifiez DATABASE_URL.`;
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "(serveur)";
       throw new Error(
-        `Impossible de contacter l’API (${apiBase}) : ${err.message}. Démarrez le backend (npm run dev:backend, port 3001) et contrôlez NEXT_PUBLIC_API_BASE_URL.${hint}`,
+        `Impossible de contacter l’API (${apiBase || origin}) : ${err.message}.${baseHint}${hint}`,
       );
     }
     throw err;
@@ -172,8 +208,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         // no-op
       }
     } else if (response.status === 404) {
-      message =
-        "API introuvable (404). Vérifiez NEXT_PUBLIC_API_BASE_URL (ex. http://localhost:3001) et que le backend tourne sur ce port.";
+      message = apiBase
+        ? "API introuvable (404). Vérifiez NEXT_PUBLIC_API_BASE_URL (ex. http://localhost:3001) et que le backend tourne sur ce port."
+        : "API introuvable (404). Les routes /api doivent être servies par cette app Next (build avec Prisma).";
     }
     throw new Error(message);
   }
@@ -244,8 +281,7 @@ export type AuthMeUser = {
 };
 
 export async function loginViaApi(identifier: string, password: string): Promise<{ user: AuthMeUser }> {
-  const apiBase = getResolvedApiBaseUrl();
-  const response = await fetch(`${apiBase}/api/auth/login`, {
+  const response = await fetch(resolveApiUrl("/api/auth/login"), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -270,8 +306,7 @@ export async function loginViaApi(identifier: string, password: string): Promise
 }
 
 export async function logoutViaApi(): Promise<void> {
-  const apiBase = getResolvedApiBaseUrl();
-  await fetch(`${apiBase}/api/auth/logout`, {
+  await fetch(resolveApiUrl("/api/auth/logout"), {
     method: "POST",
     credentials: "include",
   });
@@ -279,8 +314,7 @@ export async function logoutViaApi(): Promise<void> {
 
 /** Session cookie (sans effet de bord si 401). */
 export async function fetchAuthMe(): Promise<AuthMeUser | null> {
-  const apiBase = getResolvedApiBaseUrl();
-  const response = await fetch(`${apiBase}/api/auth/me`, { credentials: "include" });
+  const response = await fetch(resolveApiUrl("/api/auth/me"), { credentials: "include" });
   if (response.status === 401) {
     return null;
   }

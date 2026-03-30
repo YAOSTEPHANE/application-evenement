@@ -24,7 +24,7 @@ import {
   fetchAuthMe,
   importCatalogueRowsViaApi,
   loadStateFromBackend,
-  getResolvedApiBaseUrl,
+  getApiOriginForDisplay,
   saveAffectationViaApi,
   saveArticleViaApi,
   saveEventViaApi,
@@ -164,7 +164,7 @@ export default function Home() {
       }
       if (nextState.articles.length === 0 && nextState.utilisateurs.length === 0) {
         showToast(
-          `Aucune donnée côté API. Exécutez une fois : POST ${getResolvedApiBaseUrl()}/api/setup/seed (corps vide), puis rechargez. Vérifiez MongoDB et « prisma db push » sur le backend.`,
+          `Aucune donnée côté API. Exécutez une fois : POST ${getApiOriginForDisplay()}/api/setup/seed (corps vide), puis rechargez. Vérifiez MongoDB et « npx prisma db push » (dans le dossier frontend).`,
           "default",
         );
       }
@@ -182,7 +182,7 @@ export default function Home() {
       showToast(
         error instanceof Error
           ? error.message
-          : "Impossible de charger les données. Démarrez le backend (npm run dev:backend, port 3001) ou vérifiez NEXT_PUBLIC_API_BASE_URL.",
+          : "Impossible de charger les données. En monolithe : npm run dev (frontend) et DATABASE_URL. Backend séparé : npm run dev:backend (3001) ou NEXT_PUBLIC_API_BASE_URL.",
         "danger",
       );
     }
