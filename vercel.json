@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm ci --include=optional && node scripts/ensure-lightningcss-linux.mjs",
-  "buildCommand": "npm --prefix frontend run build"
+  "installCommand": "node scripts/vercel-install.mjs",
+  "buildCommand": "node scripts/vercel-build.mjs"
 }
