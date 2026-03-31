@@ -340,15 +340,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .tbl-wrap{
   max-width:100%;
-  min-width:0;
-  overflow-x:visible;
+  overflow-x:auto;
   overflow-y:visible;
+  -webkit-overflow-scrolling:touch;
 }
 .tbl{
   width:100%;
-  max-width:100%;
-  min-width:0;
-  table-layout:fixed;
+  min-width:900px;
+  table-layout:auto;
   border-collapse:collapse;
 }
 .tbl th,.tbl td{min-width:0}
@@ -356,10 +355,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   font-size:9px;font-weight:600;color:var(--text3);
   padding:8px 10px;border-bottom:1px solid var(--border);
   text-align:left;text-transform:uppercase;letter-spacing:.42px;
-  white-space:normal;
-  overflow-wrap:anywhere;
-  word-break:break-word;
-  hyphens:auto;
+  white-space:nowrap;
   background:var(--surface);
   font-family:var(--font-display);
   vertical-align:bottom;
@@ -368,8 +364,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   padding:10px 10px;border-bottom:1px solid var(--border);
   font-size:10px;color:var(--text2);
   vertical-align:top;
-  overflow-wrap:anywhere;
-  word-break:break-word;
+  white-space:nowrap;
 }
 .tbl tr:last-child td{border-bottom:none}
 .tbl tbody tr{transition:var(--anim)}
@@ -916,10 +911,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   .form-grid{grid-template-columns:1fr}
   .tbl-wrap{
     max-width:100%;
-    min-width:0;
-    overflow-x:visible;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
   }
-  .tbl{min-width:0}
+  .tbl{min-width:780px}
   .tbl th{padding:7px 8px;font-size:9px}
   .tbl td{padding:8px 9px;font-size:10px}
   .tbl .item-thumb{width:30px;height:30px;font-size:14px}
@@ -976,7 +971,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   .user-chip{padding:4px 9px 4px 4px}
   .logo-mark{width:24px;height:24px;font-size:12px}
   .ph-actions{grid-template-columns:1fr}
-  .tbl{min-width:0}
+  .tbl{min-width:720px}
   .mobile-nav{grid-template-columns:repeat(3,minmax(0,1fr))}
   .mobile-more-panel{grid-template-columns:1fr}
   .mobile-nav-item{font-size:9px;min-height:40px}
