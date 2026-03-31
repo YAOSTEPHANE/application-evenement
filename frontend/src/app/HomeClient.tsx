@@ -57,6 +57,7 @@ import type { ReturnCondition, Role, StockState } from "@/lib/stock/types";
 import { useToast } from "@/lib/stock/useToast";
 
 const SOUND_ENABLED_KEY = "stockevent_sound_enabled";
+const THEME_MODE_KEY = "stockevent_theme_mode";
 const DEFAULT_CATEGORIES = [
   "Mobilier",
   "Audiovisuel",
@@ -104,6 +105,7 @@ export default function Home() {
   const confirmCallbackRef = useRef<(() => void) | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [themeMode, setThemeMode] = useState<"light" | "dark">("light");
 
   const appCounts = useMemo(() => counts(state), [state]);
   const currentUser = useMemo(() => currentUserDisplay(state), [state]);
@@ -211,6 +213,30 @@ export default function Home() {
       // ignore storage errors
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(THEME_MODE_KEY);
+      if (raw === "dark" || raw === "light") {
+        setThemeMode(raw);
+        return;
+      }
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        setThemeMode("dark");
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  useEffect(() => {
+    document.body.setAttribute("data-theme", themeMode);
+    try {
+      window.localStorage.setItem(THEME_MODE_KEY, themeMode);
+    } catch {
+      // ignore storage errors
+    }
+  }, [themeMode]);
 
   useEffect(() => {
     if (!eventModalOpen) {
@@ -429,6 +455,10 @@ export default function Home() {
       showToast(next ? "Son activé" : "Son désactivé", "default");
       return next;
     });
+  }
+
+  function toggleTheme() {
+    setThemeMode((prev) => (prev === "dark" ? "light" : "dark"));
   }
 
   function resetArticleForm() {
@@ -840,6 +870,8 @@ export default function Home() {
         onOpenAlerts={() => setActivePage("alertes")}
         onOpenProfile={() => setActivePage("profil")}
         onSearchChange={runGlobalSearch}
+        themeMode={themeMode}
+        onToggleTheme={toggleTheme}
       />
       <Sidebar
         activePage={activePage}

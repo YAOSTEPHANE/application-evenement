@@ -1,4 +1,3 @@
-import { MovementType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
@@ -86,9 +85,9 @@ export async function GET() {
     if (!bucket) {
       continue;
     }
-    if (m.movementType === MovementType.OUTBOUND) {
+    if (m.movementType === "OUTBOUND") {
       bucket.outbound += m.quantity;
-    } else if (m.movementType === MovementType.RETURN) {
+    } else if (m.movementType === "RETURN") {
       bucket.returns += m.quantity;
     } else {
       bucket.other += m.quantity;

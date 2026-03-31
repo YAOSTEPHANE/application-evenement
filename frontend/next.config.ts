@@ -1,24 +1,6 @@
-import path from "path";
 import type { NextConfig } from "next";
 
-const prismaClientAlias = path.resolve(__dirname, ".prisma-generated");
-
 const nextConfig: NextConfig = {
-  // Client Prisma généré hors node_modules (voir prisma/schema.prisma) — alias Webpack (build prod) et Turbopack (next dev --turbopack).
-  turbopack: {
-    resolveAlias: {
-      "@prisma/client": prismaClientAlias,
-    },
-  },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        "@prisma/client": prismaClientAlias,
-      };
-    }
-    return config;
-  },
   // Les navigateurs demandent /favicon.ico par défaut. Une redirection 302 peut encore apparaître en « 404 »
   // selon l’outil réseau ; une réécriture interne renvoie le SVG avec un 200 sur /favicon.ico.
   async rewrites() {
@@ -54,9 +36,6 @@ const nextConfig: NextConfig = {
 
     return rewrites;
   },
-  // Racine du monorepo (parent de `frontend/`) — évite l’ambiguïté avec plusieurs package-lock.json
-  // et aligne le file tracing avec `npm run build --workspace frontend` (Vercel, CI).
-  outputFileTracingRoot: path.join(__dirname, ".."),
   // Binaires natifs Tailwind 4 / lightningcss : ne pas les bundler via le hook require de Next.
   serverExternalPackages: [
     "@prisma/client",

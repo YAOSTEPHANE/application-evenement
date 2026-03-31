@@ -9,6 +9,8 @@ type TopbarProps = {
   onOpenAlerts?: () => void;
   onOpenProfile?: () => void;
   onSearchChange?: (value: string) => void;
+  themeMode?: "light" | "dark";
+  onToggleTheme?: () => void;
 };
 
 export function Topbar({
@@ -18,6 +20,8 @@ export function Topbar({
   onOpenAlerts,
   onOpenProfile,
   onSearchChange,
+  themeMode = "light",
+  onToggleTheme,
 }: TopbarProps) {
   return (
     <header id="topbar">
@@ -42,6 +46,16 @@ export function Topbar({
       </div>
 
       <div className="top-right">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => onToggleTheme?.()}
+          title={themeMode === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+          aria-label={themeMode === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+        >
+          <span aria-hidden="true">{themeMode === "dark" ? "☀" : "☾"}</span>
+        </button>
+
         <button
           type="button"
           className="icon-btn"

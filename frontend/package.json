@@ -7,10 +7,10 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "node ../scripts/prisma-generate-safe.mjs && next build --webpack",
+    "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "prisma:generate": "node ../scripts/prisma-generate-safe.mjs",
+    "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push"
   },
   "dependencies": {

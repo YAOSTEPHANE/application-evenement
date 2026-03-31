@@ -1,8 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
-  // Hors node_modules : évite EPERM sur query_engine-windows.dll.node (verrouillage par Node / antivirus).
-  output        = "../.prisma-generated"
 }
 
 datasource db {

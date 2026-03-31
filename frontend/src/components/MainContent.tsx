@@ -5,6 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AnalyticsRapports } from "@/components/AnalyticsRapports";
 import {
+  ActivityAreaChart,
+  CategoryDonut,
+  MovementMixBars,
+  type SeriesPoint,
+} from "@/components/AnalyticsCharts";
+import {
   fetchAuditLogsFromApi,
   fetchCategoriesWithCounts,
   fetchDashboardFromApi,
@@ -100,6 +106,49 @@ const DEFAULT_CATEGORIES = [
   "Éclairage",
   "Autre",
 ];
+
+function dashboardSeries(movements: StockState["mouvements"], days: number): SeriesPoint[] {
+  const dayKeys: string[] = [];
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dayKeys.push(d.toISOString().slice(0, 10));
+  }
+  const map = new Map(dayKeys.map((day) => [day, { outbound: 0, returns: 0, other: 0 }]));
+  for (const movement of movements) {
+    const key = movement.date.slice(0, 10);
+    const bucket = map.get(key);
+    if (!bucket) {
+      continue;
+    }
+    if (movement.type === "Sortie") {
+      bucket.outbound += movement.qty;
+    } else if (movement.type === "Retour") {
+      bucket.returns += movement.qty;
+    } else {
+      bucket.other += movement.qty;
+    }
+  }
+  return dayKeys.map((day) => {
+    const bucket = map.get(day)!;
+    return { day, ...bucket, total: bucket.outbound + bucket.returns + bucket.other };
+  });
+}
+
+function dashboardMix(movements: StockState["mouvements"]): Record<string, number> {
+  const mix: Record<string, number> = { OUTBOUND: 0, RETURN: 0, ADJUSTMENT: 0 };
+  for (const movement of movements) {
+    if (movement.type === "Sortie") {
+      mix.OUTBOUND += movement.qty;
+    } else if (movement.type === "Retour") {
+      mix.RETURN += movement.qty;
+    } else {
+      mix.ADJUSTMENT += movement.qty;
+    }
+  }
+  return mix;
+}
+
 export function MainContent({
   activePage,
   state,
@@ -138,6 +187,7 @@ export function MainContent({
   const [catalogueSearch, setCatalogueSearch] = useState("");
   const [catalogueFilter, setCatalogueFilter] = useState("");
   const [movementFilter, setMovementFilter] = useState("");
+  const [topPeriodDays, setTopPeriodDays] = useState<7 | 14 | 30>(14);
   const [profileAvatarDataUrl, setProfileAvatarDataUrl] = useState("");
   const [calendarCursor, setCalendarCursor] = useState(() => new Date(state.calYear, state.calMonth, 1));
 
@@ -243,6 +293,38 @@ export function MainContent({
   const alerts = state.articles.filter((article) => dispo(article) <= article.seuilMin);
   const affectedCount = state.articles.reduce((sum, article) => sum + article.qtyAff, 0);
   const stockValue = state.articles.reduce((sum, article) => sum + article.qtyTotal * article.valUnit, 0);
+  const totalUnits = state.articles.reduce((sum, article) => sum + article.qtyTotal, 0);
+  const availableUnits = state.articles.reduce((sum, article) => sum + dispo(article), 0);
+  const stockCoverageRate = totalUnits > 0 ? Math.round((availableUnits / totalUnits) * 100) : 0;
+  const allocationRate = totalUnits > 0 ? Math.round((affectedCount / totalUnits) * 100) : 0;
+  const criticalStockValue = state.articles
+    .filter((article) => dispo(article) <= article.seuilMin)
+    .reduce((sum, article) => sum + article.valUnit * Math.max(0, dispo(article)), 0);
+  const nextEvent = [...activeEvents].sort((a, b) => (a.debut || "").localeCompare(b.debut || ""))[0];
+  const nextEventItemsOut = nextEvent
+    ? state.mouvements
+        .filter((movement) => movement.evId === nextEvent.id && movement.type === "Sortie")
+        .reduce((sum, movement) => sum + movement.qty, 0)
+    : 0;
+  const lastMovement = state.mouvements[0];
+  const alertRate = state.articles.length > 0 ? Math.round((alerts.length / state.articles.length) * 100) : 0;
+  const dashboardPeriodMovements = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - (topPeriodDays - 1));
+    return state.mouvements.filter((movement) => {
+      const movementDate = new Date(movement.date);
+      return !Number.isNaN(movementDate.getTime()) && movementDate >= cutoff;
+    });
+  }, [state.mouvements, topPeriodDays]);
+  const dashboardActivitySeries = useMemo(
+    () => dashboardSeries(dashboardPeriodMovements, topPeriodDays),
+    [dashboardPeriodMovements, topPeriodDays],
+  );
+  const dashboardMovementMix = useMemo(
+    () => dashboardMix(dashboardPeriodMovements),
+    [dashboardPeriodMovements],
+  );
   const scanArticle = useMemo(
     () => state.articles.find((article) => article.ref.toLowerCase() === scanRef.trim().toLowerCase()),
     [scanRef, state.articles],
@@ -333,6 +415,21 @@ export function MainContent({
       categoryDistribution,
     };
   }, [state.articles, state.mouvements]);
+  const dashboardTopArticles = useMemo(() => {
+    const byArticle = new Map<string, number>();
+    dashboardPeriodMovements.forEach((movement) => {
+      if (movement.type !== "Sortie") {
+        return;
+      }
+      byArticle.set(movement.articleId, (byArticle.get(movement.articleId) ?? 0) + movement.qty);
+    });
+    return Array.from(byArticle.entries())
+      .map(([id, qty]) => ({ id, qty, article: state.articles.find((article) => article.id === id) }))
+      .filter((item) => Boolean(item.article))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+  }, [dashboardPeriodMovements, state.articles]);
+  const dashboardTopMax = Math.max(1, ...dashboardTopArticles.map((item) => item.qty));
   const scanHistoryItems = useMemo(() => {
     if (state.scanHistory.length > 0) {
       return state.scanHistory.slice(0, 10);
@@ -423,7 +520,9 @@ export function MainContent({
         <div className="ph">
           <div className="ph-left">
             <div className="ph-title">Tableau de bord</div>
-            <div className="ph-sub" id="dash-date" />
+            <div className="ph-sub">
+              Vision unifiée de l&apos;inventaire, des événements et des opérations en cours.
+            </div>
           </div>
           <div className="ph-actions">
             <button className="btn btn-outline btn-sm" type="button">
@@ -432,6 +531,46 @@ export function MainContent({
             <button className="btn btn-gold" type="button" onClick={onOpenArticleModal}>
               + Nouvel article
             </button>
+          </div>
+        </div>
+
+        <div className="dash-hero">
+          <div className="dash-hero-glow" aria-hidden />
+          <div className="dash-hero-main">
+            <p className="dash-hero-eyebrow">Pilotage opérationnel</p>
+            <h2 className="dash-hero-title">
+              Performance stock en temps réel, prête pour vos prochains événements.
+            </h2>
+            <p className="dash-hero-sub">
+              Priorisez les réapprovisionnements, sécurisez les sorties et gardez une vision claire sur la valeur de
+              votre parc.
+            </p>
+            <div className="dash-hero-pills">
+              <span className="dash-pill">{fmtNum(totalUnits)} unités</span>
+              <span className="dash-pill">{fmtNum(state.evenements.length)} événements</span>
+              <span className="dash-pill">{stockCoverageRate}% couverture</span>
+            </div>
+          </div>
+          <div className="dash-hero-side">
+            <div className="dash-hero-kpi">
+              <span className="dash-hero-kpi-label">Valeur du stock</span>
+              <strong className="dash-hero-kpi-value">{fmtNum(stockValue)}</strong>
+              <span className="dash-hero-kpi-unit">F CFA</span>
+            </div>
+            <div className="dash-hero-kpi dash-hero-kpi-alt">
+              <span className="dash-hero-kpi-label">Alertes critiques</span>
+              <strong className="dash-hero-kpi-value">{fmtNum(alerts.length)}</strong>
+              <span className="dash-hero-kpi-unit">articles à traiter</span>
+            </div>
+            <div className="dash-hero-event">
+              <span className="dash-hero-event-label">Prochain jalon opérationnel</span>
+              <strong className="dash-hero-event-title">{nextEvent ? nextEvent.nom : "Aucun événement planifié"}</strong>
+              <span className="dash-hero-event-sub">
+                {nextEvent
+                  ? `${fmt(nextEvent.debut)} · ${nextEventItemsOut} unité(s) déjà sorties`
+                  : "Créez un événement pour lancer la planification logistique."}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -461,6 +600,103 @@ export function MainContent({
             <div className="mc-sub">{fmtNum(stockValue)} F CFA de valeur stock</div>
           </div>
         </div>
+
+        <div className="dash-insights">
+          <div className="dash-insight-card">
+            <div className="dash-insight-label">Taux d&apos;affectation</div>
+            <div className="dash-insight-value">{allocationRate}%</div>
+            <div className="dash-insight-sub">{fmtNum(affectedCount)} unités engagées sur {fmtNum(totalUnits)}</div>
+            <div className="dash-insight-meter" aria-hidden>
+              <progress className="dash-insight-meter-progress" value={allocationRate} max={100} />
+            </div>
+          </div>
+          <div className="dash-insight-card">
+            <div className="dash-insight-label">Couverture de stock</div>
+            <div className="dash-insight-value">
+              {stockCoverageRate}%
+            </div>
+            <div className="dash-insight-sub">
+              {fmtNum(availableUnits)} unités disponibles sur {fmtNum(totalUnits)}
+            </div>
+            <div className="dash-insight-meter" aria-hidden>
+              <progress className="dash-insight-meter-progress" value={stockCoverageRate} max={100} />
+            </div>
+          </div>
+          <div className="dash-insight-card">
+            <div className="dash-insight-label">Pression alertes</div>
+            <div className="dash-insight-value">
+              {alertRate}%
+            </div>
+            <div className="dash-insight-sub">
+              {lastMovement
+                ? `Dernier mouvement: ${lastMovement.type} · ${fmtTime(lastMovement.date)}`
+                : "Aucun mouvement enregistré pour le moment."}
+            </div>
+            <div className="dash-insight-meter" aria-hidden>
+              <progress className="dash-insight-meter-progress" value={Math.min(alertRate, 100)} max={100} />
+            </div>
+          </div>
+        </div>
+
+        <div className="dash-charts">
+          <section className="card card-pad">
+            <div className="card-title">
+              <h3>▦ Tendance des mouvements ({topPeriodDays} jours)</h3>
+              <div className="dash-top-controls" role="group" aria-label="Période des graphiques">
+                {[7, 14, 30].map((days) => (
+                  <button
+                    key={`series-${days}`}
+                    type="button"
+                    className={`filt${topPeriodDays === days ? " active" : ""}`}
+                    onClick={() => setTopPeriodDays(days as 7 | 14 | 30)}
+                  >
+                    {days}j
+                  </button>
+                ))}
+              </div>
+            </div>
+            <ActivityAreaChart series={dashboardActivitySeries} loading={false} />
+          </section>
+          <section className="card card-pad">
+            <div className="card-title">
+              <h3>◌ Répartition du stock</h3>
+            </div>
+            <CategoryDonut distribution={reportStats.categoryDistribution} />
+            <div className="mt12">
+              <MovementMixBars mix={dashboardMovementMix} loading={false} />
+            </div>
+          </section>
+        </div>
+
+        <section className="card card-pad dash-top-chart">
+          <div className="card-title">
+            <h3>▲ Top 5 articles les plus sortis</h3>
+              <span className="dash-top-caption">{topPeriodDays} derniers jours</span>
+          </div>
+          {dashboardTopArticles.length === 0 ? (
+            <div className="empty-state">
+              <p>Aucune sortie enregistrée sur {topPeriodDays} jour(s).</p>
+            </div>
+          ) : (
+            <div className="dash-top-list">
+              {dashboardTopArticles.map((item, index) => (
+                <div key={item.id} className="dash-top-row">
+                  <div className="dash-top-rank">{index + 1}</div>
+                  <div className="dash-top-main">
+                    <div className="dash-top-name">{item.article?.nom ?? "Article"}</div>
+                    <div className="dash-top-ref">{item.article?.ref || "Réf. —"}</div>
+                    <progress
+                      className="progress-meter progress-meter-info dash-top-bar"
+                      value={item.qty}
+                      max={dashboardTopMax}
+                    />
+                  </div>
+                  <div className="dash-top-val">{fmtNum(item.qty)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <div className="dash-layout">
           <div className="dash-col">
@@ -563,11 +799,37 @@ export function MainContent({
                         </div>
                       </div>
                       <div className="gauge-bar">
+                        <div className="gauge-pct">
+                          {Math.round((available / total) * 100)}%
+                        </div>
                         <progress className={`progress-meter ${ratioClass}`} value={available} max={total} />
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="card card-pad dash-action-card">
+              <div className="card-title">
+                <h3>⚡ Actions rapides</h3>
+              </div>
+              <div className="dash-action-grid">
+                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenSortieModal}>
+                  ↗ Nouvelle sortie
+                </button>
+                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenRetourModal}>
+                  ↩ Enregistrer retour
+                </button>
+                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenEventModal}>
+                  ◈ Créer événement
+                </button>
+                <button className="btn btn-gold btn-sm" type="button" onClick={() => onNavigate("alertes")}>
+                  ◬ Traiter alertes
+                </button>
+              </div>
+              <div className="dash-action-foot">
+                Valeur en stock critique: <strong>{fmtNum(criticalStockValue)} F CFA</strong>
               </div>
             </div>
 

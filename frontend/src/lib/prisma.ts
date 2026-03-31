@@ -27,7 +27,6 @@ function withMongoDriverTimeouts(url: string | undefined): string | undefined {
 }
 
 const databaseUrl = withMongoDriverTimeouts(process.env.DATABASE_URL);
-
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
