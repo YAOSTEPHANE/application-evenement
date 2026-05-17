@@ -20,6 +20,7 @@ const updateUserSchema = z.object({
   fullName: z.string().min(2).optional(),
   avatarUrl: z.url().nullable().optional(),
   role: z.nativeEnum(Role).optional(),
+  active: z.boolean().optional(),
   /** Réinitialisation du mot de passe (admin uniquement). */
   password: z.string().min(8).optional(),
 });
@@ -41,6 +42,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         email: true,
         avatarUrl: true,
         role: true,
+        active: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -127,6 +129,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         fullName: payload.fullName ?? existing.fullName,
         avatarUrl: payload.avatarUrl === undefined ? existing.avatarUrl : payload.avatarUrl,
         role: payload.role ?? existing.role,
+        active: payload.active ?? existing.active,
         passwordHash: nextPasswordHash,
       },
       select: {
@@ -136,6 +139,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         email: true,
         avatarUrl: true,
         role: true,
+        active: true,
         createdAt: true,
         updatedAt: true,
       },

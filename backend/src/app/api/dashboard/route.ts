@@ -1,3 +1,4 @@
+import { EventLifecycle, MovementType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
@@ -31,7 +32,7 @@ export async function GET() {
     activeEvents,
     criticalItems,
     movementCount,
-    totalStockValue,
+    itemsForValue,
     movementTypeGroups,
     recentMovements,
   ] = await Promise.all([
@@ -39,7 +40,9 @@ export async function GET() {
     prisma.event.count({
       where: {
         organizationId,
-        endsAt: { gte: new Date() },
+        lifecycle: {
+          in: [EventLifecycle.PLANNED, EventLifecycle.PREPARING, EventLifecycle.READY],
+        },
       },
     }),
     prisma.item.findMany({
@@ -49,9 +52,9 @@ export async function GET() {
       take: 10,
     }),
     prisma.stockMovement.count({ where: { organizationId } }),
-    prisma.item.aggregate({
+    prisma.item.findMany({
       where: { organizationId },
-      _sum: { unitValue: true, totalQuantity: true },
+      select: { unitValue: true, totalQuantity: true },
     }),
     prisma.stockMovement.groupBy({
       by: ["movementType"],
@@ -65,6 +68,10 @@ export async function GET() {
   ]);
 
   const alerts = criticalItems.filter((item) => item.availableQty <= item.minThreshold);
+  const stockValueEstimate = itemsForValue.reduce(
+    (sum, row) => sum + row.unitValue * row.totalQuantity,
+    0,
+  );
 
   const movementByType: Record<string, number> = {
     OUTBOUND: 0,
@@ -85,9 +92,9 @@ export async function GET() {
     if (!bucket) {
       continue;
     }
-    if (m.movementType === "OUTBOUND") {
+    if (m.movementType === MovementType.OUTBOUND) {
       bucket.outbound += m.quantity;
-    } else if (m.movementType === "RETURN") {
+    } else if (m.movementType === MovementType.RETURN) {
       bucket.returns += m.quantity;
     } else {
       bucket.other += m.quantity;
@@ -113,8 +120,7 @@ export async function GET() {
       activeEvents,
       alerts: alerts.length,
       movements: movementCount,
-      stockValueEstimate:
-        (totalStockValue._sum.unitValue ?? 0) * (totalStockValue._sum.totalQuantity ?? 0),
+      stockValueEstimate,
       allocationRatePct,
     },
     alerts,

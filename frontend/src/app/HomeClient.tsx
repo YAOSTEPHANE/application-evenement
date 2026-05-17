@@ -8,6 +8,7 @@ import { ModalAffect } from "@/components/ModalAffect";
 import { ModalArticle } from "@/components/ModalArticle";
 import { ModalConfirm } from "@/components/ModalConfirm";
 import { ModalEvent } from "@/components/ModalEvent";
+import { ModalReception } from "@/components/ModalReception";
 import { ModalRetour } from "@/components/ModalRetour";
 import { ModalSortie } from "@/components/ModalSortie";
 import { ModalCategory } from "@/components/ModalCategory";
@@ -28,8 +29,10 @@ import {
   saveAffectationViaApi,
   saveArticleViaApi,
   saveEventViaApi,
+  saveReceptionViaApi,
   saveRetourViaApi,
   saveSortieViaApi,
+  toggleUserActiveViaApi,
   searchViaApi,
   saveUserViaApi,
   saveProfileViaApi,
@@ -53,7 +56,7 @@ import {
   setSessionUserId,
 } from "@/lib/stock/session";
 import { saveState } from "@/lib/stock/storage";
-import type { ReturnCondition, Role, StockState } from "@/lib/stock/types";
+import type { EventStatus, ReturnCondition, Role, StockState } from "@/lib/stock/types";
 import { useToast } from "@/lib/stock/useToast";
 
 const SOUND_ENABLED_KEY = "stockevent_sound_enabled";
@@ -87,6 +90,8 @@ export default function Home() {
   const [articleModalOpen, setArticleModalOpen] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [affectModalOpen, setAffectModalOpen] = useState(false);
+  const [affectPreset, setAffectPreset] = useState<{ evId: string; evName: string } | null>(null);
+  const [receptionModalOpen, setReceptionModalOpen] = useState(false);
   const [sortieModalOpen, setSortieModalOpen] = useState(false);
   const [retourModalOpen, setRetourModalOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -257,7 +262,55 @@ export default function Home() {
     if (articleSelect) {
       articleSelect.innerHTML = affectArticleOptions;
     }
-  }, [affectModalOpen, affectArticleOptions]);
+    const hidden = document.getElementById("affect-ev-id") as HTMLInputElement | null;
+    const nameEl = document.getElementById("affect-ev-name");
+    const picker = document.getElementById("affect-ev-picker");
+    const eventSelect = document.getElementById("affect-ev-select") as HTMLSelectElement | null;
+    if (affectPreset?.evId) {
+      if (hidden) {
+        hidden.value = affectPreset.evId;
+      }
+      if (nameEl) {
+        nameEl.textContent = affectPreset.evName;
+        nameEl.style.display = "";
+      }
+      if (picker) {
+        picker.style.display = "none";
+      }
+    } else {
+      if (hidden) {
+        hidden.value = "";
+      }
+      if (nameEl) {
+        nameEl.style.display = "none";
+      }
+      if (picker) {
+        picker.style.display = "";
+      }
+      if (eventSelect) {
+        const options = state.evenements
+          .filter((event) => event.statut !== "Terminé" && event.statut !== "Annulé")
+          .map((event) => `<option value="${event.id}">${event.nom}</option>`)
+          .join("");
+        eventSelect.innerHTML = `<option value="">— Sélectionner un événement —</option>${options}`;
+        eventSelect.onchange = () => {
+          if (hidden) {
+            hidden.value = eventSelect.value;
+          }
+        };
+      }
+    }
+  }, [affectModalOpen, affectArticleOptions, affectPreset, state.evenements]);
+
+  useEffect(() => {
+    if (!receptionModalOpen) {
+      return;
+    }
+    const articleSelect = document.getElementById("reception-article") as HTMLSelectElement | null;
+    if (articleSelect) {
+      articleSelect.innerHTML = articleOptions;
+    }
+  }, [receptionModalOpen, articleOptions]);
 
   useEffect(() => {
     if (!sortieModalOpen) {
@@ -535,6 +588,17 @@ export default function Home() {
     setFieldValue("ev-statut", event.statut);
     setFieldValue("ev-notes", event.notes || "");
     setEventModalOpen(true);
+  }
+
+  function openAffectModal(eventId?: string, eventName?: string) {
+    if (eventId) {
+      const name =
+        eventName ?? state.evenements.find((event) => event.id === eventId)?.nom ?? "Événement";
+      setAffectPreset({ evId: eventId, evName: name });
+    } else {
+      setAffectPreset(null);
+    }
+    setAffectModalOpen(true);
   }
 
   function openEditUser(userId: string) {
@@ -896,8 +960,18 @@ export default function Home() {
           resetEventForm();
           setEventModalOpen(true);
         }}
-        onOpenAffectModal={() => {
-          setAffectModalOpen(true);
+        onOpenAffectModal={openAffectModal}
+        onOpenReceptionModal={() => setReceptionModalOpen(true)}
+        onToggleUserActive={(userId, active) => {
+          void (async () => {
+            try {
+              const message = await toggleUserActiveViaApi(userId, active);
+              await refreshStateFromApi();
+              showToast(message, "ok");
+            } catch (error) {
+              showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+            }
+          })();
         }}
         onOpenSortieModal={() => {
           setSortieModalOpen(true);
@@ -1094,6 +1168,8 @@ export default function Home() {
               qtyTotal: Number.parseInt(getInputValue("art-qty"), 10) || 0,
               valUnit: Number.parseFloat(getInputValue("art-val")) || 0,
               seuilMin: Number.parseInt(getInputValue("art-seuil"), 10) || 5,
+              emoji: getInputValue("art-emoji"),
+              notes: getInputValue("art-notes"),
             });
             await refreshStateFromApi();
             showToast(message, "ok");
@@ -1117,6 +1193,8 @@ export default function Home() {
               fin: getInputValue("ev-fin"),
               lieu: getInputValue("ev-lieu"),
               ownerId: ownerId || state.currentUser,
+              statut: (getSelectValue("ev-statut") || "Planifié") as EventStatus,
+              notes: getInputValue("ev-notes"),
             });
             await refreshStateFromApi();
             showToast(message, "ok");
@@ -1128,17 +1206,40 @@ export default function Home() {
       />
       <ModalAffect
         isOpen={affectModalOpen}
-        onClose={() => setAffectModalOpen(false)}
+        onClose={() => {
+          setAffectModalOpen(false);
+          setAffectPreset(null);
+        }}
         onSave={async () => {
           try {
+            const evId = getInputValue("affect-ev-id") || getSelectValue("affect-ev-select");
             const message = await saveAffectationViaApi({
-              evId: getInputValue("affect-ev-id"),
+              evId,
               artId: getSelectValue("affect-article"),
               qty: Number.parseInt(getInputValue("affect-qty"), 10) || 1,
             });
             await refreshStateFromApi();
             showToast(message, "ok");
             setAffectModalOpen(false);
+            setAffectPreset(null);
+          } catch (error) {
+            showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+          }
+        }}
+      />
+      <ModalReception
+        isOpen={receptionModalOpen}
+        onClose={() => setReceptionModalOpen(false)}
+        onSave={async () => {
+          try {
+            const message = await saveReceptionViaApi({
+              artId: getSelectValue("reception-article"),
+              qty: Number.parseInt(getInputValue("reception-qty"), 10) || 1,
+              note: getInputValue("reception-note"),
+            });
+            await refreshStateFromApi();
+            showToast(message, "ok");
+            setReceptionModalOpen(false);
           } catch (error) {
             showToast(error instanceof Error ? error.message : "Action impossible", "danger");
           }

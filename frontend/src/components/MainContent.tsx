@@ -29,9 +29,11 @@ type MainContentProps = {
   onNavigate: (page: PageId) => void;
   onOpenArticleModal: () => void;
   onOpenEventModal: () => void;
-  onOpenAffectModal: () => void;
+  onOpenAffectModal: (eventId?: string, eventName?: string) => void;
+  onOpenReceptionModal: () => void;
   onOpenSortieModal: () => void;
   onOpenRetourModal: () => void;
+  onToggleUserActive: (userId: string, active: boolean) => void;
   onOpenUserModal: () => void;
   /** Réservé aux administrateurs : création / édition / suppression d’utilisateurs. */
   canManageUsers: boolean;
@@ -156,8 +158,10 @@ export function MainContent({
   onOpenArticleModal,
   onOpenEventModal,
   onOpenAffectModal,
+  onOpenReceptionModal,
   onOpenSortieModal,
   onOpenRetourModal,
+  onToggleUserActive,
   onOpenUserModal,
   canManageUsers,
   canManageCategories,
@@ -232,7 +236,7 @@ export function MainContent({
   }, [activePage, loadAuditLogs]);
 
   useEffect(() => {
-    if (activePage !== "rapports") {
+    if (activePage !== "rapports" && activePage !== "dashboard") {
       return;
     }
     let cancel = false;
@@ -301,11 +305,7 @@ export function MainContent({
     .filter((article) => dispo(article) <= article.seuilMin)
     .reduce((sum, article) => sum + article.valUnit * Math.max(0, dispo(article)), 0);
   const nextEvent = [...activeEvents].sort((a, b) => (a.debut || "").localeCompare(b.debut || ""))[0];
-  const nextEventItemsOut = nextEvent
-    ? state.mouvements
-        .filter((movement) => movement.evId === nextEvent.id && movement.type === "Sortie")
-        .reduce((sum, movement) => sum + movement.qty, 0)
-    : 0;
+  const nextEventItemsOut = nextEvent ? nextEvent.itemsAffectes : 0;
   const lastMovement = state.mouvements[0];
   const alertRate = state.articles.length > 0 ? Math.round((alerts.length / state.articles.length) * 100) : 0;
   const dashboardPeriodMovements = useMemo(() => {
@@ -325,6 +325,33 @@ export function MainContent({
     () => dashboardMix(dashboardPeriodMovements),
     [dashboardPeriodMovements],
   );
+  const dashActivitySeries = useMemo(() => {
+    if (!dashData?.movementsSeries14d?.length) {
+      return dashboardActivitySeries;
+    }
+    return dashData.movementsSeries14d.map((point) => ({
+      day: point.day,
+      outbound: point.outbound,
+      returns: point.returns,
+      other: point.other,
+      total: point.total,
+    }));
+  }, [dashData, dashboardActivitySeries]);
+  const dashMovementMix = useMemo(() => {
+    if (dashData?.movementByType && Object.keys(dashData.movementByType).length > 0) {
+      return {
+        OUTBOUND: dashData.movementByType.OUTBOUND ?? 0,
+        RETURN: dashData.movementByType.RETURN ?? 0,
+        ADJUSTMENT: dashData.movementByType.ADJUSTMENT ?? 0,
+      };
+    }
+    return dashboardMovementMix;
+  }, [dashData, dashboardMovementMix]);
+  const apiMetrics = dashData?.metrics;
+  const heroStockValue = apiMetrics?.stockValueEstimate ?? stockValue;
+  const heroAlertsCount = apiMetrics?.alerts ?? alerts.length;
+  const metricsActiveEvents = apiMetrics?.activeEvents ?? activeEvents.length;
+  const insightAllocationRate = apiMetrics?.allocationRatePct ?? allocationRate;
   const scanArticle = useMemo(
     () => state.articles.find((article) => article.ref.toLowerCase() === scanRef.trim().toLowerCase()),
     [scanRef, state.articles],
@@ -473,6 +500,29 @@ export function MainContent({
     onScanSortie(payload);
   }
 
+  function exportAlertsCsv() {
+    const rows = [
+      ["Référence", "Désignation", "Disponible", "Seuil min", "Catégorie"],
+      ...alerts.map((article) => [
+        article.ref,
+        article.nom,
+        String(dispo(article)),
+        String(article.seuilMin),
+        article.cat,
+      ]),
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${cell.replaceAll("\"", "\"\"")}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "stockevent_alertes.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function exportCatalogueCsv() {
     const rows = [
       ["Référence", "Désignation", "Catégorie", "Qté Totale", "Disponible", "Affecté", "Valeur Unit.", "Seuil Min", "Notes"],
@@ -525,8 +575,8 @@ export function MainContent({
             </div>
           </div>
           <div className="ph-actions">
-            <button className="btn btn-outline btn-sm" type="button">
-              ↓ Exporter
+            <button className="btn btn-outline btn-sm" type="button" onClick={exportAlertsCsv}>
+              ↓ Exporter alertes
             </button>
             <button className="btn btn-gold" type="button" onClick={onOpenArticleModal}>
               + Nouvel article
@@ -554,12 +604,12 @@ export function MainContent({
           <div className="dash-hero-side">
             <div className="dash-hero-kpi">
               <span className="dash-hero-kpi-label">Valeur du stock</span>
-              <strong className="dash-hero-kpi-value">{fmtNum(stockValue)}</strong>
+              <strong className="dash-hero-kpi-value">{fmtNum(heroStockValue)}</strong>
               <span className="dash-hero-kpi-unit">F CFA</span>
             </div>
             <div className="dash-hero-kpi dash-hero-kpi-alt">
               <span className="dash-hero-kpi-label">Alertes critiques</span>
-              <strong className="dash-hero-kpi-value">{fmtNum(alerts.length)}</strong>
+              <strong className="dash-hero-kpi-value">{fmtNum(heroAlertsCount)}</strong>
               <span className="dash-hero-kpi-unit">articles à traiter</span>
             </div>
             <div className="dash-hero-event">
@@ -584,7 +634,7 @@ export function MainContent({
           <div className="mc mc-gold">
             <div className="mc-accent" />
             <div className="mc-label">Événements actifs</div>
-            <div className="mc-value">{activeEvents.length}</div>
+            <div className="mc-value">{metricsActiveEvents}</div>
             <div className="mc-sub">sur {state.evenements.length} événements</div>
           </div>
           <div className="mc mc-ok">
@@ -604,7 +654,7 @@ export function MainContent({
         <div className="dash-insights">
           <div className="dash-insight-card">
             <div className="dash-insight-label">Taux d&apos;affectation</div>
-            <div className="dash-insight-value">{allocationRate}%</div>
+            <div className="dash-insight-value">{insightAllocationRate}%</div>
             <div className="dash-insight-sub">{fmtNum(affectedCount)} unités engagées sur {fmtNum(totalUnits)}</div>
             <div className="dash-insight-meter" aria-hidden>
               <progress className="dash-insight-meter-progress" value={allocationRate} max={100} />
@@ -655,7 +705,7 @@ export function MainContent({
                 ))}
               </div>
             </div>
-            <ActivityAreaChart series={dashboardActivitySeries} loading={false} />
+            <ActivityAreaChart series={dashActivitySeries} loading={dashLoading && !dashData} />
           </section>
           <section className="card card-pad">
             <div className="card-title">
@@ -663,7 +713,7 @@ export function MainContent({
             </div>
             <CategoryDonut distribution={reportStats.categoryDistribution} />
             <div className="mt12">
-              <MovementMixBars mix={dashboardMovementMix} loading={false} />
+              <MovementMixBars mix={dashMovementMix} loading={dashLoading && !dashData} />
             </div>
           </section>
         </div>
@@ -762,7 +812,7 @@ export function MainContent({
                         </td>
                         <td>{fmt(event.debut)}</td>
                         <td>{event.lieu || "—"}</td>
-                        <td>{state.mouvements.filter((m) => m.evId === event.id && m.type === "Sortie").length}</td>
+                        <td>{fmtNum(event.itemsAffectes)}</td>
                         <td>
                           <span className={`badge ${eventStatusClass[event.statut] ?? "badge-gray"}`}>{event.statut}</span>
                         </td>
@@ -820,6 +870,12 @@ export function MainContent({
                 </button>
                 <button className="btn btn-outline btn-sm" type="button" onClick={onOpenRetourModal}>
                   ↩ Enregistrer retour
+                </button>
+                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenReceptionModal}>
+                  + Réception stock
+                </button>
+                <button className="btn btn-outline btn-sm" type="button" onClick={() => onOpenAffectModal()}>
+                  ◈ Affecter articles
                 </button>
                 <button className="btn btn-outline btn-sm" type="button" onClick={onOpenEventModal}>
                   ◈ Créer événement
@@ -886,6 +942,9 @@ export function MainContent({
             </button>
             <button className="btn btn-outline btn-sm" type="button" onClick={exportCatalogueCsv}>
               ↓ Export CSV
+            </button>
+            <button className="btn btn-outline btn-sm" type="button" onClick={onOpenReceptionModal}>
+              + Réception
             </button>
             <button className="btn btn-gold" type="button" onClick={onOpenArticleModal}>
               + Nouvel article
@@ -1166,7 +1225,7 @@ export function MainContent({
                     </td>
                     <td>{event.lieu || "—"}</td>
                     <td>{event.resp || "—"}</td>
-                    <td>{state.mouvements.filter((m) => m.evId === event.id && m.type === "Sortie").length}</td>
+                    <td>{fmtNum(event.itemsAffectes)}</td>
                     <td>
                       <span className={`badge ${eventStatusClass[event.statut] ?? "badge-gray"}`}>{event.statut}</span>
                     </td>
@@ -1175,7 +1234,7 @@ export function MainContent({
                         <button
                           className="btn btn-outline btn-xs"
                           type="button"
-                          onClick={() => onOpenAffectModal()}
+                          onClick={() => onOpenAffectModal(event.id, event.nom)}
                         >
                           + Affecter
                         </button>{" "}
@@ -1211,7 +1270,7 @@ export function MainContent({
           ) : null}
         </div>
         <div className="actions-row-end mt12">
-          <button className="btn btn-outline btn-sm" type="button" onClick={onOpenAffectModal}>
+          <button className="btn btn-outline btn-sm" type="button" onClick={() => onOpenAffectModal()}>
             + Affecter des articles
           </button>
         </div>
@@ -1224,6 +1283,9 @@ export function MainContent({
             <div className="ph-sub">Historique complet des entrées, sorties et retours</div>
           </div>
           <div className="ph-actions">
+            <button className="btn btn-outline" type="button" onClick={onOpenReceptionModal}>
+              + Réception stock
+            </button>
             <button className="btn btn-outline" type="button" onClick={onOpenSortieModal}>
               ↗ Enregistrer une sortie
             </button>
@@ -1710,6 +1772,13 @@ export function MainContent({
                     <td>
                       {canManageUsers ? (
                         <div className="row-actions">
+                          <button
+                            className="btn btn-outline btn-xs"
+                            type="button"
+                            onClick={() => onToggleUserActive(user.id, !user.actif)}
+                          >
+                            {user.actif ? "Désactiver" : "Activer"}
+                          </button>{" "}
                           <button className="btn btn-outline btn-xs" type="button" onClick={() => onEditUser(user.id)}>
                             Modif.
                           </button>{" "}

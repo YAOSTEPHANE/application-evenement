@@ -29,6 +29,8 @@ export type Evenement = {
   resp: string;
   statut: EventStatus;
   notes: string;
+  /** Quantité planifiée via EventItem (affectations sans sortie physique). */
+  itemsAffectes: number;
 };
 
 export type Movement = {

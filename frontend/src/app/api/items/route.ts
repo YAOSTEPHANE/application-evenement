@@ -15,6 +15,8 @@ const createItemSchema = z.object({
   totalQuantity: z.number().int().positive(),
   minThreshold: z.number().int().nonnegative().default(0),
   photoUrl: z.string().url().optional(),
+  emoji: z.string().max(8).optional(),
+  notes: z.string().max(2000).optional(),
 });
 
 export async function GET() {
@@ -30,6 +32,8 @@ export async function GET() {
       name: true,
       reference: true,
       photoUrl: true,
+      emoji: true,
+      notes: true,
       unitValue: true,
       totalQuantity: true,
       availableQty: true,
@@ -62,6 +66,8 @@ export async function POST(request: Request) {
         reference: payload.reference,
         categoryId: payload.categoryId,
         photoUrl: payload.photoUrl,
+        emoji: payload.emoji ?? "📦",
+        notes: payload.notes,
         unitValue: payload.unitValue,
         totalQuantity: payload.totalQuantity,
         availableQty: payload.totalQuantity,

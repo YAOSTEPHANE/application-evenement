@@ -35,6 +35,7 @@ export async function GET() {
       email: true,
       avatarUrl: true,
       role: true,
+      active: true,
       createdAt: true,
       updatedAt: true,
     },

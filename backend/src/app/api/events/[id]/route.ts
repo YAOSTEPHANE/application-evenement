@@ -1,3 +1,4 @@
+import { EventLifecycle } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -16,6 +17,8 @@ const updateEventSchema = z.object({
   startsAt: z.coerce.date().optional(),
   endsAt: z.coerce.date().optional(),
   ownerId: objectId.optional(),
+  lifecycle: z.nativeEnum(EventLifecycle).optional(),
+  notes: z.string().max(2000).optional().nullable(),
 });
 
 export async function GET(_request: Request, { params }: RouteParams) {
@@ -84,6 +87,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         startsAt,
         endsAt,
         ownerId: payload.ownerId ?? existing.ownerId,
+        lifecycle: payload.lifecycle ?? existing.lifecycle,
+        notes: payload.notes === undefined ? existing.notes : payload.notes,
       },
     });
 

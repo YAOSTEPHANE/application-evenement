@@ -1,3 +1,4 @@
+import { EventLifecycle } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -14,6 +15,8 @@ const createEventSchema = z.object({
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
   ownerId: objectId,
+  lifecycle: z.nativeEnum(EventLifecycle).optional(),
+  notes: z.string().max(2000).optional(),
   allocations: z
     .array(
       z.object({
@@ -123,6 +126,8 @@ export async function POST(request: Request) {
           startsAt: payload.startsAt,
           endsAt: payload.endsAt,
           ownerId: payload.ownerId,
+          lifecycle: payload.lifecycle ?? EventLifecycle.PLANNED,
+          notes: payload.notes,
           organizationId,
         },
       });

@@ -72,19 +72,26 @@ export async function POST(request: Request) {
       }
 
       if (payload.movementType === MovementType.RETURN) {
+        const returnData: {
+          allocatedQty: { decrement: number };
+          availableQty?: { increment: number };
+          repairQty?: { increment: number };
+          totalQuantity?: { decrement: number };
+        } = {
+          allocatedQty: { decrement: payload.quantity },
+        };
+
+        if (payload.returnCondition === ReturnCondition.OK) {
+          returnData.availableQty = { increment: payload.quantity };
+        } else if (payload.returnCondition === ReturnCondition.DAMAGED) {
+          returnData.repairQty = { increment: payload.quantity };
+        } else if (payload.returnCondition === ReturnCondition.MISSING) {
+          returnData.totalQuantity = { decrement: payload.quantity };
+        }
+
         await tx.item.update({
           where: { id: item.id },
-          data: {
-            allocatedQty: { decrement: payload.quantity },
-            availableQty:
-              payload.returnCondition === ReturnCondition.OK
-                ? { increment: payload.quantity }
-                : undefined,
-            repairQty:
-              payload.returnCondition === ReturnCondition.DAMAGED
-                ? { increment: payload.quantity }
-                : undefined,
-          },
+          data: returnData,
         });
       }
 

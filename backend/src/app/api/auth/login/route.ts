@@ -43,6 +43,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Identifiant ou mot de passe incorrect." }, { status: 401 });
     }
 
+    if (user.active === false) {
+      return NextResponse.json({ message: "Ce compte est désactivé. Contactez un administrateur." }, { status: 403 });
+    }
+
     const token = await createSessionToken(user.id, user.organizationId, user.role);
     const res = NextResponse.json({
       user: {

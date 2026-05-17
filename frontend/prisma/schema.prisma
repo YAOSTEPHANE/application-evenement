@@ -33,6 +33,14 @@ enum ReturnCondition {
   MISSING
 }
 
+enum EventLifecycle {
+  PLANNED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
 model Organization {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String
@@ -56,6 +64,7 @@ model User {
   avatarUrl      String?
   passwordHash   String?
   role           Role
+  active         Boolean  @default(true)
   organizationId String   @db.ObjectId
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -89,6 +98,8 @@ model Item {
   name             String
   reference        String
   photoUrl         String?
+  emoji            String?    @default("📦")
+  notes            String?
   unitValue        Float
   totalQuantity    Int
   availableQty     Int
@@ -112,16 +123,18 @@ model Item {
 }
 
 model Event {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
   name           String
   location       String
   clientName     String
   startsAt       DateTime
   endsAt         DateTime
-  organizationId String   @db.ObjectId
-  ownerId        String   @db.ObjectId
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  lifecycle      EventLifecycle @default(PLANNED)
+  notes          String?
+  organizationId String         @db.ObjectId
+  ownerId        String         @db.ObjectId
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   owner        User           @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)

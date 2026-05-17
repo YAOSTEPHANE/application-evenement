@@ -1,6 +1,6 @@
 import { assertMongoApiId } from "./mongo-id";
 import { clearSession } from "./session";
-import type { Role, ReturnCondition, StockState } from "./types";
+import type { EventStatus, Role, ReturnCondition, StockState } from "./types";
 
 /**
  * Une chaîne vide dans .env (`NEXT_PUBLIC_API_BASE_URL=`) reste définie : `??` ne retombe pas sur le défaut,
@@ -107,6 +107,37 @@ function resolveApiUrl(path: string): string {
 type BackendUserRole = "ADMIN" | "MANAGER" | "STOREKEEPER" | "VIEWER";
 type BackendMovementType = "OUTBOUND" | "RETURN" | "ADJUSTMENT";
 type BackendReturnCondition = "OK" | "DAMAGED" | "MISSING";
+type BackendEventLifecycle = "PLANNED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
+
+function eventLifecycleFromBackend(lifecycle: BackendEventLifecycle): EventStatus {
+  switch (lifecycle) {
+    case "PREPARING":
+      return "En préparation";
+    case "READY":
+      return "Prêt";
+    case "COMPLETED":
+      return "Terminé";
+    case "CANCELLED":
+      return "Annulé";
+    default:
+      return "Planifié";
+  }
+}
+
+function eventLifecycleToBackend(statut: EventStatus): BackendEventLifecycle {
+  switch (statut) {
+    case "En préparation":
+      return "PREPARING";
+    case "Prêt":
+      return "READY";
+    case "Terminé":
+      return "COMPLETED";
+    case "Annulé":
+      return "CANCELLED";
+    default:
+      return "PLANNED";
+  }
+}
 
 function roleToBackend(role: Role): BackendUserRole {
   switch (role) {
@@ -154,6 +185,19 @@ function returnConditionToBackend(condition: ReturnCondition): BackendReturnCond
       return "DAMAGED";
     default:
       return "MISSING";
+  }
+}
+
+function returnConditionFromBackend(condition?: BackendReturnCondition | null): string {
+  switch (condition) {
+    case "OK":
+      return "Bon état";
+    case "DAMAGED":
+      return "Endommagé";
+    case "MISSING":
+      return "Perdu";
+    default:
+      return "";
   }
 }
 
@@ -233,6 +277,8 @@ type ItemDto = {
   allocatedQty: number;
   minThreshold: number;
   photoUrl?: string | null;
+  emoji?: string | null;
+  notes?: string | null;
 };
 type EventDto = {
   id: string;
@@ -241,7 +287,10 @@ type EventDto = {
   startsAt: string;
   endsAt: string;
   location: string;
+  lifecycle?: BackendEventLifecycle;
+  notes?: string | null;
   owner?: { fullName?: string } | null;
+  eventItems?: Array<{ itemId: string; quantity: number }>;
 };
 type MovementDto = {
   id: string;
@@ -261,6 +310,7 @@ type UserDto = {
   email: string;
   avatarUrl?: string | null;
   role: BackendUserRole;
+  active?: boolean;
 };
 
 function splitFullName(fullName: string) {
@@ -337,7 +387,7 @@ export async function fetchUsersList(): Promise<StockState["utilisateurs"]> {
       email: user.email,
       avatarUrl: user.avatarUrl ?? "",
       role: roleFromBackend(user.role),
-      actif: true,
+      actif: user.active !== false,
     };
   });
 }
@@ -363,7 +413,7 @@ export async function loadStateFromBackend(previous: StockState): Promise<StockS
       email: user.email,
       avatarUrl: user.avatarUrl ?? "",
       role: roleFromBackend(user.role),
-      actif: true,
+      actif: user.active !== false,
     };
   });
 
@@ -381,8 +431,8 @@ export async function loadStateFromBackend(previous: StockState): Promise<StockS
       qtyAff: item.allocatedQty,
       valUnit: item.unitValue,
       seuilMin: item.minThreshold,
-      emoji: "📦",
-      notes: item.photoUrl ?? "",
+      emoji: item.emoji?.trim() || "📦",
+      notes: item.notes ?? "",
     })),
     evenements: events.map((event) => ({
       id: event.id,
@@ -392,20 +442,28 @@ export async function loadStateFromBackend(previous: StockState): Promise<StockS
       fin: event.endsAt.slice(0, 10),
       lieu: event.location,
       resp: event.owner?.fullName ?? "",
-      statut: "Planifié",
-      notes: "",
+      statut: eventLifecycleFromBackend(event.lifecycle ?? "PLANNED"),
+      notes: event.notes ?? "",
+      itemsAffectes: (event.eventItems ?? []).reduce((sum, row) => sum + row.quantity, 0),
     })),
-    mouvements: movements.map((movement) => ({
-      id: movement.id,
-      type: movementTypeFromBackend(movement.movementType),
-      articleId: movement.itemId,
-      qty: movement.quantity,
-      evId: movement.eventId ?? "",
-      operateur: movement.actor?.fullName ?? "",
-      etat: movement.returnCondition ?? "",
-      note: movement.notes ?? "",
-      date: movement.createdAt,
-    })),
+    mouvements: movements.map((movement) => {
+      const etat = returnConditionFromBackend(movement.returnCondition);
+      let type = movementTypeFromBackend(movement.movementType);
+      if (movement.movementType === "RETURN" && movement.returnCondition === "MISSING") {
+        type = "Perte";
+      }
+      return {
+        id: movement.id,
+        type,
+        articleId: movement.itemId,
+        qty: movement.quantity,
+        evId: movement.eventId ?? "",
+        operateur: movement.actor?.fullName ?? "",
+        etat,
+        note: movement.notes ?? "",
+        date: movement.createdAt,
+      };
+    }),
     utilisateurs: nextUsers,
     currentUser: nextUsers.some((user) => user.id === previous.currentUser)
       ? previous.currentUser
@@ -439,6 +497,8 @@ export async function saveArticleViaApi(payload: {
   qtyTotal: number;
   valUnit: number;
   seuilMin: number;
+  emoji?: string;
+  notes?: string;
 }) {
   const categoryId = await resolveCategoryId(payload.cat || "Autre");
   const body = {
@@ -448,6 +508,8 @@ export async function saveArticleViaApi(payload: {
     unitValue: payload.valUnit,
     totalQuantity: payload.qtyTotal,
     minThreshold: payload.seuilMin,
+    emoji: payload.emoji?.trim() || "📦",
+    notes: payload.notes?.trim() || undefined,
   };
 
   if (payload.id) {
@@ -474,6 +536,8 @@ export async function saveEventViaApi(payload: {
   fin: string;
   lieu: string;
   ownerId: string;
+  statut?: EventStatus;
+  notes?: string;
 }) {
   const startsAt = new Date(`${payload.debut}T00:00:00.000Z`).toISOString();
   const endsAt = new Date(`${(payload.fin || payload.debut) as string}T23:59:59.999Z`).toISOString();
@@ -484,6 +548,8 @@ export async function saveEventViaApi(payload: {
     startsAt,
     endsAt,
     ownerId: payload.ownerId,
+    lifecycle: eventLifecycleToBackend(payload.statut ?? "Planifié"),
+    notes: payload.notes?.trim() || undefined,
     allocations: [],
   };
 
@@ -505,20 +571,45 @@ export async function saveEventViaApi(payload: {
 
 export async function saveAffectationViaApi(payload: { artId: string; evId: string; qty: number }) {
   assertMongoApiId(payload.artId, "Article");
-  if (payload.evId) {
-    assertMongoApiId(payload.evId, "Événement");
+  if (!payload.evId) {
+    throw new Error("Sélectionnez un événement pour l'affectation.");
   }
+  assertMongoApiId(payload.evId, "Événement");
+  await apiFetch(`/api/events/${payload.evId}/allocations`, {
+    method: "POST",
+    body: JSON.stringify({
+      itemId: payload.artId,
+      quantity: payload.qty,
+    }),
+  });
+  return "Affectation planifiée sur l'événement";
+}
+
+export async function saveReceptionViaApi(payload: {
+  artId: string;
+  qty: number;
+  note?: string;
+}) {
+  assertMongoApiId(payload.artId, "Article");
   await apiFetch("/api/movements", {
     method: "POST",
     body: JSON.stringify({
-      movementType: "OUTBOUND",
+      movementType: "ADJUSTMENT",
       itemId: payload.artId,
-      eventId: payload.evId || undefined,
       quantity: payload.qty,
-      notes: "Affectation événement",
+      notes: payload.note?.trim() || "Réception / ajustement stock",
     }),
   });
-  return "Affectation enregistrée";
+  return "Réception enregistrée";
+}
+
+export async function toggleUserActiveViaApi(userId: string, active: boolean) {
+  assertMongoApiId(userId, "Utilisateur");
+  await apiFetch(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ active }),
+  });
+  return active ? "Utilisateur réactivé" : "Utilisateur désactivé";
 }
 
 export async function saveSortieViaApi(payload: { artId: string; evId: string; qty: number; note: string }) {

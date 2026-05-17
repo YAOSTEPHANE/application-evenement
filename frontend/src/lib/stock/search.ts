@@ -2,7 +2,8 @@ import type { StockState } from "./types";
 
 type SearchResult =
   | { type: "article"; label: string; page: "catalogue" }
-  | { type: "event"; label: string; page: "evenements" };
+  | { type: "event"; label: string; page: "evenements" }
+  | { type: "user"; label: string; page: "utilisateurs" };
 
 export function globalSearch(state: StockState, query: string): SearchResult | null {
   const q = query.trim().toLowerCase();
@@ -22,6 +23,16 @@ export function globalSearch(state: StockState, query: string): SearchResult | n
   );
   if (event) {
     return { type: "event", label: event.nom, page: "evenements" };
+  }
+
+  const user = state.utilisateurs.find(
+    (item) =>
+      `${item.prenom} ${item.nom}`.toLowerCase().includes(q) ||
+      item.email.toLowerCase().includes(q) ||
+      (item.username?.toLowerCase().includes(q) ?? false),
+  );
+  if (user) {
+    return { type: "user", label: `${user.prenom} ${user.nom}`, page: "utilisateurs" };
   }
 
   return null;

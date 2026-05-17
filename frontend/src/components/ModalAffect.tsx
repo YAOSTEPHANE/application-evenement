@@ -21,6 +21,12 @@ export function ModalAffect({ isOpen, onClose, onSave }: ModalAffectProps) {
 
         <div className="form-grid">
           <input type="hidden" id="affect-ev-id" />
+          <div className="fg full" id="affect-ev-picker">
+            <label>Événement *</label>
+            <select className="fs" id="affect-ev-select" aria-label="Événement" defaultValue="">
+              <option value="">— Sélectionner un événement —</option>
+            </select>
+          </div>
           <div className="fg">
             <label>Article *</label>
             <select className="fs" id="affect-article" aria-label="Article" />

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { MovementType, ReturnCondition, Role } from "@prisma/client";
+import { EventLifecycle, MovementType, ReturnCondition, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 /** IDs fixes 24 hex (ObjectId) pour un seed idempotent. */
@@ -30,6 +30,7 @@ export const SEED_IDS = {
   eiSeminaireHousse: "000000000000000000000045",
   mov1: "000000000000000000000050",
   mov2: "000000000000000000000051",
+  mov3: "000000000000000000000052",
 } as const;
 
 export async function seedDemoData(prisma: PrismaClient) {
@@ -51,6 +52,7 @@ export async function seedDemoData(prisma: PrismaClient) {
       email: "admin@stockevent.local",
       fullName: "Admin StockEvent",
       role: Role.ADMIN,
+      active: true,
     },
     {
       id: SEED_IDS.userManager,
@@ -58,6 +60,7 @@ export async function seedDemoData(prisma: PrismaClient) {
       email: "manager@stockevent.local",
       fullName: "Aminata Diallo",
       role: Role.MANAGER,
+      active: true,
     },
     {
       id: SEED_IDS.userStorekeeper,
@@ -65,6 +68,7 @@ export async function seedDemoData(prisma: PrismaClient) {
       email: "magasinier@stockevent.local",
       fullName: "Koffi N'Guessan",
       role: Role.STOREKEEPER,
+      active: true,
     },
     {
       id: SEED_IDS.userViewer,
@@ -72,6 +76,7 @@ export async function seedDemoData(prisma: PrismaClient) {
       email: "lecture@stockevent.local",
       fullName: "Sophie Martin",
       role: Role.VIEWER,
+      active: false,
     },
   ] as const;
 
@@ -85,6 +90,7 @@ export async function seedDemoData(prisma: PrismaClient) {
         organizationId: orgId,
         username: u.username,
         passwordHash,
+        active: u.active,
       },
       create: {
         id: u.id,
@@ -94,6 +100,7 @@ export async function seedDemoData(prisma: PrismaClient) {
         role: u.role,
         organizationId: orgId,
         passwordHash,
+        active: u.active,
       },
     });
   }
@@ -120,6 +127,8 @@ export async function seedDemoData(prisma: PrismaClient) {
     name: string;
     reference: string;
     categoryId: string;
+    emoji: string;
+    notes: string;
     unitValue: number;
     totalQuantity: number;
     availableQty: number;
@@ -134,6 +143,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       name: "Chaise Napoléon dorée",
       reference: "MOB-001",
       categoryId: SEED_IDS.catMobilier,
+      emoji: "🪑",
+      notes: "Fournisseur: Déco Plus CI",
       unitValue: 12000,
       totalQuantity: 150,
       availableQty: 115,
@@ -146,6 +157,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       name: "Micro sans fil Shure",
       reference: "AV-014",
       categoryId: SEED_IDS.catAudiovisuel,
+      emoji: "🎤",
+      notes: "Modèle BLX288/PG58",
       unitValue: 85000,
       totalQuantity: 24,
       availableQty: 8,
@@ -158,6 +171,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       name: "Guirlande LED 30m",
       reference: "DEC-022",
       categoryId: SEED_IDS.catDecoration,
+      emoji: "✨",
+      notes: "Blanc chaud 3000K",
       unitValue: 18500,
       totalQuantity: 40,
       availableQty: 2,
@@ -170,6 +185,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       name: "Nappe ronde blanc 240cm",
       reference: "VAI-008",
       categoryId: SEED_IDS.catVaisselle,
+      emoji: "🍽️",
+      notes: "Lavage à 60°C",
       unitValue: 4500,
       totalQuantity: 60,
       availableQty: 50,
@@ -182,6 +199,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       name: "Projecteur LED 200W",
       reference: "ECL-003",
       categoryId: SEED_IDS.catAutre,
+      emoji: "💡",
+      notes: "RGB 150W",
       unitValue: 62000,
       totalQuantity: 35,
       availableQty: 30,
@@ -194,6 +213,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       name: "Housse stretch noire",
       reference: "TXT-011",
       categoryId: SEED_IDS.catAutre,
+      emoji: "🧵",
+      notes: "Laize 3m",
       unitValue: 3200,
       totalQuantity: 80,
       availableQty: 75,
@@ -211,6 +232,8 @@ export async function seedDemoData(prisma: PrismaClient) {
         name: it.name,
         reference: it.reference,
         categoryId: it.categoryId,
+        emoji: it.emoji,
+        notes: it.notes,
         unitValue: it.unitValue,
         totalQuantity: it.totalQuantity,
         availableQty: it.availableQty,
@@ -224,6 +247,8 @@ export async function seedDemoData(prisma: PrismaClient) {
         name: it.name,
         reference: it.reference,
         categoryId: it.categoryId,
+        emoji: it.emoji,
+        notes: it.notes,
         unitValue: it.unitValue,
         totalQuantity: it.totalQuantity,
         availableQty: it.availableQty,
@@ -251,6 +276,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       endsAt: eventReceptionEnd,
       ownerId: SEED_IDS.userAdmin,
       organizationId: orgId,
+      lifecycle: EventLifecycle.PREPARING,
+      notes: "200 convives — menu buffet",
     },
     create: {
       id: SEED_IDS.eventReception,
@@ -261,6 +288,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       endsAt: eventReceptionEnd,
       ownerId: SEED_IDS.userAdmin,
       organizationId: orgId,
+      lifecycle: EventLifecycle.PREPARING,
+      notes: "200 convives — menu buffet",
     },
   });
 
@@ -274,6 +303,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       endsAt: eventSemEnd,
       ownerId: SEED_IDS.userManager,
       organizationId: orgId,
+      lifecycle: EventLifecycle.PLANNED,
+      notes: "Salon plénière + 3 salles ateliers",
     },
     create: {
       id: SEED_IDS.eventSeminaire,
@@ -284,6 +315,8 @@ export async function seedDemoData(prisma: PrismaClient) {
       endsAt: eventSemEnd,
       ownerId: SEED_IDS.userManager,
       organizationId: orgId,
+      lifecycle: EventLifecycle.PLANNED,
+      notes: "Salon plénière + 3 salles ateliers",
     },
   });
 
@@ -348,6 +381,25 @@ export async function seedDemoData(prisma: PrismaClient) {
       eventId: SEED_IDS.eventReception,
       actorId: SEED_IDS.userStorekeeper,
       createdAt: new Date(movDate.getTime() + 60 * 60 * 1000),
+    },
+  });
+
+  await prisma.stockMovement.upsert({
+    where: { id: SEED_IDS.mov3 },
+    update: {
+      movementType: MovementType.ADJUSTMENT,
+      quantity: 20,
+      notes: "Réception fournisseur — lot chaises",
+    },
+    create: {
+      id: SEED_IDS.mov3,
+      movementType: MovementType.ADJUSTMENT,
+      quantity: 20,
+      notes: "Réception fournisseur — lot chaises",
+      organizationId: orgId,
+      itemId: SEED_IDS.itemChaise,
+      actorId: SEED_IDS.userStorekeeper,
+      createdAt: new Date(movDate.getTime() - 24 * 60 * 60 * 1000),
     },
   });
 

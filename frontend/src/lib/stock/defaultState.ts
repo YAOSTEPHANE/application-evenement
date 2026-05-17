@@ -113,6 +113,7 @@ export function defaultState(): StockState {
         resp: "Kofi Mensah",
         statut: "Prêt",
         notes: "",
+        itemsAffectes: 12,
       },
       {
         id: "e2",
@@ -124,6 +125,7 @@ export function defaultState(): StockState {
         resp: "Sarah Lozano",
         statut: "En préparation",
         notes: "200 convives",
+        itemsAffectes: 8,
       },
       {
         id: "e3",
@@ -135,6 +137,7 @@ export function defaultState(): StockState {
         resp: "Aminata Diallo",
         statut: "Planifié",
         notes: "",
+        itemsAffectes: 0,
       },
       {
         id: "e4",
@@ -146,6 +149,7 @@ export function defaultState(): StockState {
         resp: "Kofi Mensah",
         statut: "Planifié",
         notes: "Thème jardin",
+        itemsAffectes: 0,
       },
     ],
     mouvements: [
