@@ -1,0 +1,3 @@
+{
+  "/api/rfid-reading-equipment/route": "app/api/rfid-reading-equipment/route.js"
+}

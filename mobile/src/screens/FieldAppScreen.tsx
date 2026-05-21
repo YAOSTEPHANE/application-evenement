@@ -17,7 +17,9 @@ import {
   loadFieldCache,
   saveFieldCache,
   type CachedDocument,
+  type CachedWarehouse,
 } from "@/lib/offline-cache";
+import { refreshOfflineSpec, type MobileOfflineSpec } from "@/lib/offline-spec";
 import {
   enqueueOfflineAction,
   flushOfflineQueue,
@@ -94,6 +96,12 @@ export function FieldAppScreen() {
   const [incidentDesc, setIncidentDesc] = useState("");
   const [createEventId, setCreateEventId] = useState("");
   const [createTags, setCreateTags] = useState("");
+  const [warehouses, setWarehouses] = useState<CachedWarehouse[]>([]);
+  const [btFromId, setBtFromId] = useState("");
+  const [btToId, setBtToId] = useState("");
+  const [btTags, setBtTags] = useState("");
+  const [bonMode, setBonMode] = useState<"bs" | "bt">("bs");
+  const [offlineSpec, setOfflineSpec] = useState<MobileOfflineSpec | null>(null);
 
   const applyCache = useCallback((cache: Awaited<ReturnType<typeof loadFieldCache>>) => {
     if (!cache) return;
@@ -104,6 +112,7 @@ export function FieldAppScreen() {
     setLeaderEvents(cache.leaderEvents);
     setPortals(cache.portals);
     setHandhelds(cache.handhelds);
+    setWarehouses(cache.warehouses ?? []);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -119,11 +128,12 @@ export function FieldAppScreen() {
         return;
       }
 
-      const [docsRes, assignRes, portalsRes, handheldsRes] = await Promise.all([
+      const [docsRes, assignRes, portalsRes, handheldsRes, whRes] = await Promise.all([
         apiFetch("/api/stock-documents"),
         apiFetch("/api/terrain/my-assignments"),
         apiFetch("/api/rfid-portals?active=1"),
         apiFetch("/api/rfid-handhelds?active=1"),
+        apiFetch("/api/warehouses"),
       ]);
 
       let docs: DocRow[] = [];
@@ -131,6 +141,7 @@ export function FieldAppScreen() {
       let leaders: AssignmentRow["event"][] = [];
       let portalRows: Array<{ id: string; code: string; label: string }> = [];
       let handheldRows: Array<{ id: string; code: string; label: string }> = [];
+      let warehouseRows: CachedWarehouse[] = [];
 
       if (docsRes.ok) {
         docs = ((await docsRes.json()) as DocRow[]).filter(
@@ -156,6 +167,11 @@ export function FieldAppScreen() {
         handheldRows = (await handheldsRes.json()) as typeof handheldRows;
         setHandhelds(handheldRows);
       }
+      if (whRes.ok) {
+        const raw = (await whRes.json()) as Array<{ id: string; name: string; code: string }>;
+        warehouseRows = raw.map((w) => ({ id: w.id, name: w.name, code: w.code }));
+        setWarehouses(warehouseRows);
+      }
 
       if (docsRes.ok || assignRes.ok) {
         const cache = await loadFieldCache();
@@ -166,6 +182,7 @@ export function FieldAppScreen() {
           leaderEvents: leaders,
           portals: portalRows,
           handhelds: handheldRows,
+          warehouses: warehouseRows.length > 0 ? warehouseRows : (cache?.warehouses ?? []),
         });
       } else {
         applyCache(await loadFieldCache());
@@ -175,6 +192,10 @@ export function FieldAppScreen() {
       setMessage("API inaccessible — cache local utilisé si disponible.");
     }
   }, [applyCache]);
+
+  useEffect(() => {
+    void refreshOfflineSpec().then(setOfflineSpec);
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -271,6 +292,86 @@ export function FieldAppScreen() {
     setSelectedId(row.id);
     setCreateTags("");
     setMessage(`Bon ${row.documentNumber} créé — vous pouvez scanner.`);
+    setTab("scan");
+    void refresh();
+  }
+
+  async function createBt() {
+    if (!btFromId || !btToId) {
+      setMessage("Sélectionnez les entrepôts source et destination.");
+      return;
+    }
+    if (btFromId === btToId) {
+      setMessage("Source et destination doivent être distincts.");
+      return;
+    }
+    const tagCodes = btTags
+      .split(/[\s,;]+/)
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+    if (tagCodes.length === 0) {
+      setMessage("Saisissez au moins un tag RFID.");
+      return;
+    }
+    const payload = {
+      kind: "BT",
+      fromWarehouseId: btFromId,
+      toWarehouseId: btToId,
+      tagCodes,
+      btSubtype: "BT_SE",
+    };
+
+    if (!online) {
+      const tempId = newOfflineTempDocumentId();
+      const draft: CachedDocument = {
+        id: tempId,
+        documentNumber: `OFFLINE-BT-${tagCodes.length}L`,
+        kind: "BT",
+        status: "DRAFT",
+        offline: true,
+        clientTempId: tempId,
+      };
+      await addOfflineDraftDocument(draft);
+      await enqueueOfflineAction({
+        type: "create_document",
+        documentId: tempId,
+        clientTempId: tempId,
+        payload: { ...payload, clientTempId: tempId },
+      });
+      setDocuments((prev) => [draft, ...prev]);
+      setSelectedId(tempId);
+      setBtTags("");
+      setMessage("Bon BT en file — scan et signature possibles hors ligne.");
+      setQueueLen((await getOfflineQueue()).length);
+      setTab("scan");
+      return;
+    }
+
+    const res = await apiFetch("/api/terrain/documents", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      message?: string;
+      id?: string;
+      documentNumber?: string;
+      kind?: string;
+      status?: string;
+    };
+    if (!res.ok) {
+      setMessage(data.message ?? "Échec création du transfert");
+      return;
+    }
+    const row: DocRow = {
+      id: data.id!,
+      documentNumber: data.documentNumber ?? "—",
+      kind: data.kind ?? "BT",
+      status: data.status ?? "DRAFT",
+    };
+    setDocuments((prev) => [row, ...prev]);
+    setSelectedId(row.id);
+    setBtTags("");
+    setMessage(`Transfert ${row.documentNumber} créé — vous pouvez scanner.`);
     setTab("scan");
     void refresh();
   }
@@ -473,32 +574,97 @@ export function FieldAppScreen() {
 
       {tab === "bon" ? (
         <ScrollView style={styles.panel} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-          <Text style={styles.bonHint}>
-            Bon de sortie chantier (BS-EVT) à partir des tags RFID — disponible hors ligne, synchronisé à la
-            reconnexion.
-          </Text>
-          <PickerField
-            label="Commande / chantier"
-            value={createEventId}
-            options={[
-              { value: "", label: "— Choisir —" },
-              ...eventOptions.map((e) => ({ value: e.id, label: e.name })),
-            ]}
-            onChange={setCreateEventId}
-          />
-          <Text style={styles.label}>Tags du bon</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            multiline
-            value={createTags}
-            onChangeText={setCreateTags}
-            placeholder="TAG-… (un par ligne)"
-            placeholderTextColor={colors.text3}
-          />
-          <Pressable style={styles.btnPrimary} onPress={() => void createBon()}>
-            <Ionicons name="document-text-outline" size={20} color={colors.navy} />
-            <Text style={styles.btnPrimaryText}>Créer le bon BS-EVT</Text>
-          </Pressable>
+          {offlineSpec ? (
+            <Text style={styles.bonHint}>{offlineSpec.principle}</Text>
+          ) : (
+            <Text style={styles.bonHint}>
+              Bons terrain synchronisés à la reconnexion (ordre FIFO, actions en échec conservées).
+            </Text>
+          )}
+          <View style={styles.bonModeRow}>
+            <Pressable
+              style={[styles.bonModeBtn, bonMode === "bs" && styles.bonModeBtnActive]}
+              onPress={() => setBonMode("bs")}
+            >
+              <Text style={[styles.bonModeBtnText, bonMode === "bs" && styles.bonModeBtnTextActive]}>
+                BS-EVT
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.bonModeBtn, bonMode === "bt" && styles.bonModeBtnActive]}
+              onPress={() => setBonMode("bt")}
+            >
+              <Text style={[styles.bonModeBtnText, bonMode === "bt" && styles.bonModeBtnTextActive]}>
+                BT inter-sites
+              </Text>
+            </Pressable>
+          </View>
+          {bonMode === "bs" ? (
+            <>
+              <PickerField
+                label="Commande / chantier"
+                value={createEventId}
+                options={[
+                  { value: "", label: "— Choisir —" },
+                  ...eventOptions.map((e) => ({ value: e.id, label: e.name })),
+                ]}
+                onChange={setCreateEventId}
+              />
+              <Text style={styles.label}>Tags du bon</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                multiline
+                value={createTags}
+                onChangeText={setCreateTags}
+                placeholder="TAG-… (un par ligne)"
+                placeholderTextColor={colors.text3}
+              />
+              <Pressable style={styles.btnPrimary} onPress={() => void createBon()}>
+                <Ionicons name="document-text-outline" size={20} color={colors.navy} />
+                <Text style={styles.btnPrimaryText}>Créer le bon BS-EVT</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <PickerField
+                label="Entrepôt source"
+                value={btFromId}
+                options={[
+                  { value: "", label: "— Source —" },
+                  ...warehouses.map((w) => ({
+                    value: w.id,
+                    label: `${w.name} (${w.code})`,
+                  })),
+                ]}
+                onChange={setBtFromId}
+              />
+              <PickerField
+                label="Entrepôt destination"
+                value={btToId}
+                options={[
+                  { value: "", label: "— Destination —" },
+                  ...warehouses.map((w) => ({
+                    value: w.id,
+                    label: `${w.name} (${w.code})`,
+                  })),
+                ]}
+                onChange={setBtToId}
+              />
+              <Text style={styles.label}>Tags du transfert</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                multiline
+                value={btTags}
+                onChangeText={setBtTags}
+                placeholder="TAG-… (un par ligne)"
+                placeholderTextColor={colors.text3}
+              />
+              <Pressable style={styles.btnPrimary} onPress={() => void createBt()}>
+                <Ionicons name="swap-horizontal-outline" size={20} color={colors.navy} />
+                <Text style={styles.btnPrimaryText}>Créer le bon BT</Text>
+              </Pressable>
+            </>
+          )}
         </ScrollView>
       ) : null}
 
@@ -915,4 +1081,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   missionBtnText: { color: colors.navy, fontWeight: "700", fontSize: 13 },
+  bonModeRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  bonModeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    backgroundColor: colors.surface2,
+  },
+  bonModeBtnActive: { borderColor: colors.gold, backgroundColor: colors.surface },
+  bonModeBtnText: { fontSize: 13, fontWeight: "600", color: colors.text3 },
+  bonModeBtnTextActive: { color: colors.navy },
 });

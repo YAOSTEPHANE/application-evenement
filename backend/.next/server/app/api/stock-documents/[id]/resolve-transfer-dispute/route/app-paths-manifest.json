@@ -1,0 +1,3 @@
+{
+  "/api/stock-documents/[id]/resolve-transfer-dispute/route": "app/api/stock-documents/[id]/resolve-transfer-dispute/route.js"
+}

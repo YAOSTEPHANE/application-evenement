@@ -7,6 +7,12 @@ import {
   normalizeItemPayload,
   serializeItemRow,
 } from "@/lib/item-helpers";
+import {
+  upsertItemVariants,
+  VARIANT_PUBLIC_SELECT,
+  serializeVariantRow,
+  variantWriteSchema,
+} from "@/lib/item-variant-helpers";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
@@ -17,7 +23,30 @@ const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId in
 
 const updateItemSchema = itemUpdateSchema.extend({
   categoryId: objectId.optional(),
+  hasVariants: z.boolean().optional(),
+  variants: z.array(variantWriteSchema).max(50).optional(),
 });
+
+const itemWithVariantsSelect = {
+  ...ITEM_PUBLIC_SELECT,
+  variants: {
+    select: VARIANT_PUBLIC_SELECT,
+    orderBy: [{ sortOrder: "asc" as const }, { reference: "asc" as const }],
+  },
+};
+
+type ItemRowInput = Parameters<typeof serializeItemRow>[0];
+type RawVariantInput = Parameters<typeof serializeVariantRow>[0];
+
+function serializeItemWithVariants(
+  item: Omit<ItemRowInput, "variants"> & { variants?: RawVariantInput[] },
+) {
+  const { variants, ...rest } = item;
+  return serializeItemRow({
+    ...rest,
+    variants: (variants ?? []).map(serializeVariantRow),
+  });
+}
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
@@ -29,14 +58,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const item = await prisma.item.findFirst({
       where: { id, organizationId },
-      select: ITEM_PUBLIC_SELECT,
+      select: itemWithVariantsSelect,
     });
 
     if (!item) {
       return NextResponse.json({ message: "Article introuvable" }, { status: 404 });
     }
 
-    return NextResponse.json(serializeItemRow(item));
+    return NextResponse.json(serializeItemWithVariants(item));
   } catch {
     return NextResponse.json({ message: "Impossible de charger l'article" }, { status: 500 });
   }
@@ -70,19 +99,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }
     }
 
-    const nextTotal = payload.totalQuantity ?? existing.totalQuantity;
-    const minRequired = (existing.allocatedQty ?? 0) + (existing.repairQty ?? 0);
-    if (nextTotal < minRequired) {
-      return NextResponse.json(
-        {
-          message:
-            "La quantité totale ne peut pas être inférieure à la quantité déjà allouée/en réparation.",
-        },
-        { status: 409 },
-      );
+    const nextHasVariants =
+      payload.hasVariants !== undefined ? payload.hasVariants : existing.hasVariants;
+
+    if (nextHasVariants && payload.variants && payload.variants.length === 0) {
+      return NextResponse.json({ message: "Au moins une variante est requise." }, { status: 400 });
     }
 
-    const computedAvailable = nextTotal - existing.allocatedQty - existing.repairQty;
     const merged = {
       name: payload.name ?? existing.name,
       reference: payload.reference ?? existing.reference,
@@ -115,23 +138,63 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       alertThresholdQty: payload.alertThresholdQty ?? existing.alertThresholdQty,
       criticalThresholdQty: payload.criticalThresholdQty ?? existing.criticalThresholdQty,
       condition: payload.condition ?? existing.condition,
-      totalQuantity: nextTotal,
+      totalQuantity: payload.totalQuantity ?? existing.totalQuantity,
     };
 
     const normalized = normalizeItemPayload(merged);
 
-    const item = await prisma.item.update({
-      where: { id },
-      data: {
+    const item = await prisma.$transaction(async (tx) => {
+      let data: Record<string, unknown> = {
         ...normalized,
-        totalQuantity: nextTotal,
-        availableQty: computedAvailable,
-      },
-      select: ITEM_PUBLIC_SELECT,
+        hasVariants: nextHasVariants,
+      };
+
+      if (!nextHasVariants) {
+        const nextTotal = merged.totalQuantity;
+        const minRequired = existing.allocatedQty + existing.repairQty;
+        if (nextTotal < minRequired) {
+          throw new Error("STOCK_TOO_LOW");
+        }
+        data = {
+          ...data,
+          totalQuantity: nextTotal,
+          availableQty: nextTotal - existing.allocatedQty - existing.repairQty,
+        };
+      }
+
+      await tx.item.update({
+        where: { id },
+        data,
+      });
+
+      if (nextHasVariants && payload.variants) {
+        await upsertItemVariants(tx, organizationId, id, payload.variants);
+      }
+
+      return tx.item.findFirst({
+        where: { id },
+        select: itemWithVariantsSelect,
+      });
     });
 
-    return NextResponse.json(serializeItemRow(item));
+    if (!item) {
+      return NextResponse.json({ message: "Article introuvable" }, { status: 404 });
+    }
+
+    return NextResponse.json(serializeItemWithVariants(item));
   } catch (error) {
+    if (error instanceof Error && error.message === "STOCK_TOO_LOW") {
+      return NextResponse.json(
+        {
+          message:
+            "La quantité totale ne peut pas être inférieure à la quantité déjà allouée/en réparation.",
+        },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message.includes("variante")) {
+      return NextResponse.json({ message: error.message }, { status: 409 });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Payload invalide", errors: error.flatten() },
@@ -152,7 +215,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     const existing = await prisma.item.findFirst({
       where: { id, organizationId },
-      include: { _count: { select: { eventItems: true, movements: true } } },
+      include: { _count: { select: { eventItems: true, movements: true, variants: true } } },
     });
 
     if (!existing) {

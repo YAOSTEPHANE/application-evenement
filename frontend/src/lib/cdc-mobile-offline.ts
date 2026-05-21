@@ -11,6 +11,11 @@ export const CDC_OFFLINE_CRITICAL_ACTIONS = [
     description: "BS-EVT terrain à partir des tags RFID et de la commande.",
   },
   {
+    id: "create_bt",
+    label: "Transfert inter-sites (BT)",
+    description: "BT-SE entre deux entrepôts avec tags RFID scannés.",
+  },
+  {
     id: "scan",
     label: "Scan RFID",
     description: "Douchette ou scan sur bon ouvert.",
@@ -19,6 +24,26 @@ export const CDC_OFFLINE_CRITICAL_ACTIONS = [
     id: "sign",
     label: "Signature électronique",
     description: "Signature selon la matrice de validation.",
+  },
+  {
+    id: "event_loading",
+    label: "Chargement commande",
+    description: "Génère le BS-EVT depuis la commande (chef d'équipe).",
+  },
+  {
+    id: "event_be_ret",
+    label: "Retour commande",
+    description: "Génère le BE-RET à la clôture terrain.",
+  },
+  {
+    id: "incident",
+    label: "Incident terrain",
+    description: "Perte, casse ou autre — notification responsables.",
+  },
+  {
+    id: "portique",
+    label: "Passage portique",
+    description: "Contrôle entrée/sortie site (file si hors ligne).",
   },
 ] as const;
 

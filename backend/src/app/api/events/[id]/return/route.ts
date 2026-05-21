@@ -6,6 +6,7 @@ import { startEventReturn, StockDocumentDbError } from "@/lib/stock-document-db"
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+/** Retour prestation : génération automatique du BE-RET (réintégration RFID). */
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;

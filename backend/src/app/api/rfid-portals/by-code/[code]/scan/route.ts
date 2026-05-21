@@ -8,6 +8,7 @@ import { StockDocumentDbError, validatePortalScan } from "@/lib/stock-document-d
 
 type Params = { params: Promise<{ code: string }> };
 
+/** Point d'entrée matériel : POST /api/rfid-portals/by-code/PORTIQUE-01/scan */
 export async function POST(request: Request, { params }: Params) {
   try {
     const { organizationId } = await getRequestContext();

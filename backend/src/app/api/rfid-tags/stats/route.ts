@@ -34,7 +34,8 @@ export async function GET() {
     });
 
     const totalQty = catalogAgg._sum.totalQuantity ?? 0;
-    const coveragePct = totalQty > 0 ? Math.min(100, Math.round((totalUnits / totalQty) * 100)) : 0;
+    const taggedUnits = totalUnits;
+    const coveragePct = totalQty > 0 ? Math.min(100, Math.round((taggedUnits / totalQty) * 100)) : 0;
 
     return NextResponse.json({
       totalUnits,
@@ -43,7 +44,7 @@ export async function GET() {
       onSite,
       inTransit,
       totalQuantity: totalQty,
-      taggedUnits: totalUnits,
+      taggedUnits,
       distinctItemsTagged: taggedSum.length,
       coveragePct,
     });

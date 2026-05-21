@@ -3,7 +3,9 @@
 import { StockDocumentKind } from "@prisma/client";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
+import { ModuleGuideCollapse } from "@/components/ModuleGuideCollapse";
 import { ProfileTwoFactor } from "@/components/ProfileTwoFactor";
+import { ValidationPrincipleGuide } from "@/components/ValidationPrincipleGuide";
 import { AppIcon } from "@/components/icons/AppIcon";
 import {
   DOC_KIND_LABELS,
@@ -122,6 +124,10 @@ export function ValidationModulePage({ onNavigateToBons }: ValidationModulePageP
           </div>
         </div>
       </section>
+
+      <ModuleGuideCollapse title="Principe de validation (référence)" className="val-guide-block">
+        <ValidationPrincipleGuide />
+      </ModuleGuideCollapse>
 
       <div className="val-kpi-row">
         <div className={`val-kpi${openCount > 0 ? " val-kpi--warn" : ""}`}>

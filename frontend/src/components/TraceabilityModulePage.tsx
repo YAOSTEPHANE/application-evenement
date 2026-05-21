@@ -3,8 +3,11 @@
 import { OrderStatus } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { DrawerCloseButton } from "@/components/DrawerCloseButton";
 import { AppIcon } from "@/components/icons/AppIcon";
+import { ModuleGuideCollapse } from "@/components/ModuleGuideCollapse";
 import { ResponsibilityChain } from "@/components/ResponsibilityChain";
+import { ResponsibilityCycleGuide } from "@/components/ResponsibilityCycleGuide";
 import { ORDER_STATUS_LABELS, ASSET_STATUS_LABELS } from "@/lib/cdc-labels";
 import type { CustodyLogRow, EventTraceRow, TraceabilityStats } from "@/lib/traceability-db";
 import type { AssetFullHistory } from "@/lib/traceability-asset-history";
@@ -206,6 +209,10 @@ export function TraceabilityModulePage() {
         </div>
       </header>
 
+      <ModuleGuideCollapse title="Cycle de responsabilité (référence)" className="trace-cycle-guide-block">
+        <ResponsibilityCycleGuide />
+      </ModuleGuideCollapse>
+
       <div className="trace-kpi-row">
         <div className="trace-kpi trace-kpi--accent">
           <div className="trace-kpi-icon"><AppIcon name="rfid" size={18} /></div>
@@ -307,7 +314,8 @@ export function TraceabilityModulePage() {
           <aside className="trace-drawer">
             {selectedEvent ? (
               <>
-                <div className="trace-drawer-hd">
+                <div className="trace-drawer-hd drawer-hd-row">
+                  <div className="drawer-hd-main">
                   <h2>{selectedEvent.name}</h2>
                   <span className={`trace-ev-status trace-ev-status--${selectedEvent.orderStatus.toLowerCase()}`}>
                     {ORDER_STATUS_LABELS[selectedEvent.orderStatus]}
@@ -327,6 +335,8 @@ export function TraceabilityModulePage() {
                       <span className="trace-pill mono">BE {selectedEvent.beRetNumber}</span>
                     ) : null}
                   </div>
+                  </div>
+                  <DrawerCloseButton onClick={() => setSelectedEventId(null)} />
                 </div>
                 <div className="trace-drawer-body">
                   <ResponsibilityChain eventId={selectedEvent.id} variant="detailed" />
@@ -379,7 +389,8 @@ export function TraceabilityModulePage() {
           <aside className="trace-drawer">
             {unitDetail ? (
               <>
-                <div className="trace-drawer-hd">
+                <div className="trace-drawer-hd drawer-hd-row">
+                  <div className="drawer-hd-main">
                   <h2 className="mono">{unitDetail.tagCode}</h2>
                   <p className="fs13">{unitDetail.item.name} ({unitDetail.item.reference})</p>
                   {unitDetail.currentEvent ? (
@@ -387,6 +398,8 @@ export function TraceabilityModulePage() {
                       Sur prestation : {unitDetail.currentEvent.name} — {unitDetail.currentEvent.clientName}
                     </p>
                   ) : null}
+                  </div>
+                  <DrawerCloseButton onClick={() => setSelectedUnitId(null)} />
                 </div>
                 <div className="trace-drawer-body">
                   {unitDetail.currentCustodian ? (
@@ -516,12 +529,15 @@ export function TraceabilityModulePage() {
           <aside className="trace-drawer">
             {userHistory ? (
               <div className="trace-drawer-body">
-                <div className="trace-drawer-hd">
+                <div className="trace-drawer-hd drawer-hd-row">
+                  <div className="drawer-hd-main">
                   <h2>{userHistory.user.fullName}</h2>
                   <p className="fs12 text-muted">
                     {userHistory.user.role} · {userHistory.stats.signaturesCount} signature(s) ·{" "}
                     {userHistory.stats.openCustodies} garde(s) ouverte(s)
                   </p>
+                  </div>
+                  <DrawerCloseButton onClick={() => setSelectedUserId(null)} />
                 </div>
                 <p className="trace-section-title">Bons signés</p>
                 <ul className="trace-timeline">

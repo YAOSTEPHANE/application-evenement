@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { getRequestContext } from "@/lib/request-context";
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { listEventTraceability, listRecentCustodyLogs } from "@/lib/traceability-db";
 
 export async function GET(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { searchParams } = new URL(request.url);
     const includeLogs = searchParams.get("logs") === "1";
     const activeOnly = searchParams.get("active") === "1";
@@ -16,7 +16,10 @@ export async function GET(request: Request) {
     }
     const custodyLogs = await listRecentCustodyLogs(organizationId, 50);
     return NextResponse.json({ events, custodyLogs });
-  } catch {
+  } catch (e) {
+    if (e instanceof ApiAuthError) {
+      return NextResponse.json({ message: e.message }, { status: e.status });
+    }
     return NextResponse.json({ message: "Données traçabilité indisponibles" }, { status: 500 });
   }
 }

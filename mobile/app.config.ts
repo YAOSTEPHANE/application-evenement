@@ -26,8 +26,9 @@ const config: ExpoConfig = {
       backgroundColor: "#060e1a",
     },
     package: "com.eventrfid.terrain",
+    // HTTP LAN (API locale) — propriété manifest Android, hors types ExpoConfig stricts
     usesCleartextTraffic: true,
-  },
+  } as ExpoConfig["android"] & { usesCleartextTraffic?: boolean },
   plugins: [["expo-router", { root: "./app" }], "expo-font"],
   experiments: {
     typedRoutes: true,

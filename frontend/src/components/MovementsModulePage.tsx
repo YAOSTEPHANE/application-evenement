@@ -11,8 +11,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { btTransitPhaseLabel } from "@/lib/cdc-bt-document";
 import { archiveRetentionLabel } from "@/lib/cdc-stock-document-rules";
+import { BtDocumentGuide } from "@/components/BtDocumentGuide";
 import { CdcDirectingPrinciple } from "@/components/CdcDirectingPrinciple";
+import { ModuleGuideCollapse } from "@/components/ModuleGuideCollapse";
 import { CdcDocumentWizard } from "@/components/CdcDocumentWizard";
+import { DrawerCloseButton } from "@/components/DrawerCloseButton";
 import { CdcPageHeader } from "@/components/CdcPageHeader";
 import { AppIcon } from "@/components/icons/AppIcon";
 import { ModalStockDocument } from "@/components/ModalStockDocument";
@@ -530,6 +533,10 @@ export function MovementsModulePage({ warehouses, events, items }: MovementsModu
 
       <CdcDirectingPrinciple variant="compact" className="mb16" />
 
+      <ModuleGuideCollapse title="Bon de transfert inter-sites (BT)" className="mb16">
+        <BtDocumentGuide variant="overview" />
+      </ModuleGuideCollapse>
+
       {kpis ? (
         <div className="movements-kpi-row">
           <div className="movements-kpi">
@@ -710,7 +717,15 @@ export function MovementsModulePage({ warehouses, events, items }: MovementsModu
                 <h3 className="fw500">{detail.documentNumber}</h3>
                 <p className="fs12 text-muted">{subtypeLabel(detail)}</p>
               </div>
-              <span className={statusBadgeClass(detail.status)}>{DOC_STATUS_LABELS[detail.status]}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className={statusBadgeClass(detail.status)}>{DOC_STATUS_LABELS[detail.status]}</span>
+                <DrawerCloseButton
+                  onClick={() => {
+                    setSelectedId(null);
+                    setDetail(null);
+                  }}
+                />
+              </div>
             </div>
 
             {detail.event ? (

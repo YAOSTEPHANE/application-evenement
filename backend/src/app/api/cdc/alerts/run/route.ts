@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 
+import { ApiAuthError, assertCronSecret } from "@/lib/api-auth";
 import { runCdcScheduledAlerts } from "@/lib/cdc-alerts";
 import { prisma } from "@/lib/prisma";
 
 /** Cron CDC — header Authorization: Bearer {CDC_CRON_SECRET} */
 export async function POST(request: Request) {
-  const secret = process.env.CDC_CRON_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json({ message: "CDC_CRON_SECRET non configuré" }, { status: 503 });
-  }
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ message: "Non autorisé" }, { status: 401 });
+  try {
+    assertCronSecret(request);
+  } catch (e) {
+    if (e instanceof ApiAuthError) {
+      return NextResponse.json({ message: e.message }, { status: e.status });
+    }
+    throw e;
   }
 
   const orgs = await prisma.organization.findMany({ select: { id: true } });

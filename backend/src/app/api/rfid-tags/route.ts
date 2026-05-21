@@ -1,4 +1,4 @@
-import { TrackedAssetStatus } from "@prisma/client";
+import { ItemCondition, RfidTagType, TrackedAssetStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -16,11 +16,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ tagCode: code });
     }
     const status = searchParams.get("status");
+    const condition = searchParams.get("condition");
+    const rfidTagType = searchParams.get("rfidTagType");
     const assets = await listTrackedAssets(organizationId, {
       q: searchParams.get("q") ?? undefined,
       warehouseId: searchParams.get("warehouseId") ?? undefined,
+      categoryId: searchParams.get("categoryId") ?? undefined,
       status:
         status && status in TrackedAssetStatus ? (status as TrackedAssetStatus) : undefined,
+      condition:
+        condition && condition in ItemCondition ? (condition as ItemCondition) : undefined,
+      rfidTagType:
+        rfidTagType && rfidTagType in RfidTagType ? (rfidTagType as RfidTagType) : undefined,
     });
     return NextResponse.json(assets);
   } catch {

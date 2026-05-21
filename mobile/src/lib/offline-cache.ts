@@ -28,12 +28,15 @@ export type CachedAssignment = {
 
 export type CachedDevice = { id: string; code: string; label: string };
 
+export type CachedWarehouse = { id: string; name: string; code: string };
+
 export type FieldCacheSnapshot = {
   documents: CachedDocument[];
   assignments: CachedAssignment[];
   leaderEvents: CachedAssignment["event"][];
   portals: CachedDevice[];
   handhelds: CachedDevice[];
+  warehouses: CachedWarehouse[];
   cachedAt: string;
 };
 
@@ -54,6 +57,7 @@ export async function saveFieldCache(snapshot: Omit<FieldCacheSnapshot, "cachedA
     leaderEvents: [],
     portals: [],
     handhelds: [],
+    warehouses: [],
     cachedAt: new Date().toISOString(),
   };
   const offlineDrafts = existing.documents.filter((d) => d.offline);
@@ -76,6 +80,7 @@ export async function addOfflineDraftDocument(doc: CachedDocument): Promise<void
     leaderEvents: [],
     portals: [],
     handhelds: [],
+    warehouses: [],
     cachedAt: new Date().toISOString(),
   };
   if (cache.documents.some((d) => d.id === doc.id)) return;

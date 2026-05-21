@@ -80,6 +80,6 @@ export async function getRequestContext(): Promise<RequestContext> {
     actorId,
     role: actor?.role ?? null,
     authMethod: "legacy",
-    twoFactorVerified: true,
+    twoFactorVerified: false,
   };
 }

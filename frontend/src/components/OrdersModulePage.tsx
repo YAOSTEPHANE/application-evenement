@@ -3,6 +3,7 @@
 import { OrderStatus } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { DrawerCloseButton } from "@/components/DrawerCloseButton";
 import { FormGrid, FormInput, FormSelect, FormTextarea, ModalForm } from "@/components/forms/FormPrimitives";
 import { AppIcon } from "@/components/icons/AppIcon";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_SHORT_LABELS } from "@/lib/cdc-labels";
@@ -603,7 +604,8 @@ export function OrdersModulePage({ onRefreshEvents, onNavigateToBons }: OrdersMo
 
         {detail ? (
           <aside className="orders-drawer">
-            <div className="orders-drawer-hd">
+            <div className="orders-drawer-hd drawer-hd-row">
+              <div className="drawer-hd-main">
               <h2 className="orders-drawer-title">{detail.event.name}</h2>
               <span
                 className={`orders-drawer-status ${statusDrawerClass(detail.event.orderStatus)}`}
@@ -620,6 +622,13 @@ export function OrdersModulePage({ onRefreshEvents, onNavigateToBons }: OrdersMo
               <p className="fs12" style={{ marginTop: 4 }}>
                 {formatDateRange(detail.event.startsAt, detail.event.endsAt)}
               </p>
+              </div>
+              <DrawerCloseButton
+                onClick={() => {
+                  setSelectedId(null);
+                  setDetail(null);
+                }}
+              />
             </div>
 
             <div className="orders-drawer-body">

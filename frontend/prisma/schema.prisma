@@ -267,6 +267,7 @@ model Organization {
   documentArchives      DocumentArchive[]
   rfidPortals           RfidPortal[]
   rfidHandhelds         RfidHandheld[]
+  apiIdempotencyRecords ApiIdempotencyRecord[]
 }
 
 model User {
@@ -1095,4 +1096,21 @@ model AuditLog {
   actor        User         @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
+}
+
+/// Réponses mises en cache pour rejouer les POST offline (header Idempotency-Key).
+model ApiIdempotencyRecord {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  key            String
+  scope          String
+  statusCode     Int
+  responseBody   String
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([expiresAt])
 }

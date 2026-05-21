@@ -1,0 +1,3 @@
+{
+  "/api/cdc/traceability/users/[id]/history/route": "app/api/cdc/traceability/users/[id]/history/route.js"
+}

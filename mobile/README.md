@@ -60,18 +60,33 @@ npm run dev:mobile
 
 (`mobile/` n’est plus un workspace npm : ses dépendances s’installent dans `mobile/node_modules`.)
 
+Les scripts `dev` / `start` utilisent `scripts/expo-dev.mjs` (pas `expo start` directement).
+
 Puis scanner le QR code avec **Expo Go**, ou :
 
 - `cd mobile && npm run android`
 - `cd mobile && npm run ios` (macOS)
 
-Si le démarrage échoue avec `fetch failed` (pas d’accès à expo.dev), relancer avec :
+### Erreur `Body has already been read` au démarrage
 
-```bash
+Bug connu d’Expo CLI avec **Node 22+** : cache `native-modules-cache` + double lecture du body HTTP.
+
+`scripts/expo-dev.mjs` applique automatiquement :
+
+- suppression du cache `~/.expo/native-modules-cache` au démarrage ;
+- `EXPO_NO_DEPENDENCY_VALIDATION=1` ;
+- `EXPO_OFFLINE=1` (pas d’appel `api.expo.dev` pour les versions natives).
+
+Pour réactiver les checks réseau Expo (alignement versions) :
+
+```powershell
 cd mobile
-set EXPO_OFFLINE=1
-npm run dev
+$env:EXPO_OFFLINE = "0"
+$env:EXPO_NO_DEPENDENCY_VALIDATION = "0"
+npm run dev:expo-raw
 ```
+
+Puis si besoin : `npx expo install --fix`
 
 ## Authentification native
 

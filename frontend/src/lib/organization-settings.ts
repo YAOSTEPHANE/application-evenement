@@ -4,6 +4,7 @@ import { isValidMongoObjectId } from "@/lib/mongo-id";
 
 const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
+/** Schéma Zod exposé pour PATCH /api/settings et tests. */
 export const organizationSettingsSchema = z.object({
   defaultWarehouseId: objectId.nullable().optional(),
   /** Cible d'écart inventaire RFID (CDC : < 2 %). */

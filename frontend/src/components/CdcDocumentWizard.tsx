@@ -7,6 +7,7 @@ import { ModalHeader } from "@/components/ModalHeader";
 import { AppIcon } from "@/components/icons/AppIcon";
 import { DOC_KIND_LABELS } from "@/lib/cdc-labels";
 import { getWizardConfig, listWizardPresets, type DocumentWizardConfig } from "@/lib/cdc-wizard-config";
+import { clientFetch } from "@/lib/stock/api";
 
 type WarehouseOption = { id: string; label: string };
 type EventOption = { id: string; label: string };
@@ -61,6 +62,28 @@ export function CdcDocumentWizard({
       setError("");
     }
   }, [isOpen, initialKind, initialSubtype]);
+
+  useEffect(() => {
+    if (!isOpen || warehouses.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const res = await clientFetch("/api/settings");
+      if (!res.ok || cancelled) return;
+      const data = (await res.json()) as {
+        organization?: { settings?: { defaultWarehouseId?: string | null } };
+      };
+      const defaultId = data.organization?.settings?.defaultWarehouseId;
+      if (!defaultId || !warehouses.some((w) => w.id === defaultId)) return;
+      if (cancelled) return;
+      setFromWarehouseId((prev) => prev || defaultId);
+      if (kind === "BT") {
+        setToWarehouseId((prev) => prev || "");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, warehouses, kind]);
 
   const step = config?.steps[stepIndex];
 

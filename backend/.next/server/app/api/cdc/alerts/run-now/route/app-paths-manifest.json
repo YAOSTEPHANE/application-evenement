@@ -1,0 +1,3 @@
+{
+  "/api/cdc/alerts/run-now/route": "app/api/cdc/alerts/run-now/route.js"
+}

@@ -2,11 +2,11 @@ import { OrderStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 
 export async function GET() {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const now = new Date();
 
     const [pending, inProgress, settled, upcoming, withMaterial] = await Promise.all([
@@ -37,7 +37,10 @@ export async function GET() {
       upcoming,
       withMaterial,
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof ApiAuthError) {
+      return NextResponse.json({ message: e.message }, { status: e.status });
+    }
     return NextResponse.json({ message: "Statistiques commandes indisponibles" }, { status: 500 });
   }
 }

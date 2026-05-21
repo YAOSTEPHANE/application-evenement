@@ -239,7 +239,7 @@ function HomeApp() {
       }
       if (nextState.articles.length === 0 && nextState.utilisateurs.length === 0) {
         showToast(
-          `Aucune donnée côté API. Exécutez une fois : POST ${getApiOriginForDisplay()}/api/setup/seed (corps vide), puis rechargez. Vérifiez MongoDB et « npx prisma db push » (dans le dossier frontend).`,
+          `Aucune donnée côté API. Exécutez une fois : POST ${getApiOriginForDisplay()}/api/setup/seed (corps vide). En production : header Authorization Bearer {SEED_SECRET}. Puis rechargez. Vérifiez MongoDB et « npx prisma db push » (dossier frontend).`,
           "default",
         );
       }

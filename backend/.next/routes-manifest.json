@@ -1,0 +1,815 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/categories/[id]",
+      "regex": "^/api/categories/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/categories/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/responsibility/[eventId]",
+      "regex": "^/api/cdc/responsibility/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPeventId": "nxtPeventId"
+      },
+      "namedRegex": "^/api/cdc/responsibility/(?<nxtPeventId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/traceability/assets/[id]/history",
+      "regex": "^/api/cdc/traceability/assets/([^/]+?)/history(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/cdc/traceability/assets/(?<nxtPid>[^/]+?)/history(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/traceability/users/[id]/history",
+      "regex": "^/api/cdc/traceability/users/([^/]+?)/history(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/cdc/traceability/users/(?<nxtPid>[^/]+?)/history(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]",
+      "regex": "^/api/events/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/allocations",
+      "regex": "^/api/events/([^/]+?)/allocations(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/allocations(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/be-ret",
+      "regex": "^/api/events/([^/]+?)/be\\-ret(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/be\\-ret(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/bs-evt",
+      "regex": "^/api/events/([^/]+?)/bs\\-evt(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/bs\\-evt(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/detail",
+      "regex": "^/api/events/([^/]+?)/detail(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/detail(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/loading",
+      "regex": "^/api/events/([^/]+?)/loading(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/loading(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/operational-validation",
+      "regex": "^/api/events/([^/]+?)/operational\\-validation(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/operational\\-validation(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/pdf",
+      "regex": "^/api/events/([^/]+?)/pdf(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/pdf(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/return",
+      "regex": "^/api/events/([^/]+?)/return(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/return(?:/)?$"
+    },
+    {
+      "page": "/api/hr/vehicles/[id]",
+      "regex": "^/api/hr/vehicles/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/hr/vehicles/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/items/[id]",
+      "regex": "^/api/items/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/items/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-handhelds/by-code/[code]/scan",
+      "regex": "^/api/rfid\\-handhelds/by\\-code/([^/]+?)/scan(?:/)?$",
+      "routeKeys": {
+        "nxtPcode": "nxtPcode"
+      },
+      "namedRegex": "^/api/rfid\\-handhelds/by\\-code/(?<nxtPcode>[^/]+?)/scan(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-handhelds/[id]",
+      "regex": "^/api/rfid\\-handhelds/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/rfid\\-handhelds/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-portals/by-code/[code]/scan",
+      "regex": "^/api/rfid\\-portals/by\\-code/([^/]+?)/scan(?:/)?$",
+      "routeKeys": {
+        "nxtPcode": "nxtPcode"
+      },
+      "namedRegex": "^/api/rfid\\-portals/by\\-code/(?<nxtPcode>[^/]+?)/scan(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-portals/[id]",
+      "regex": "^/api/rfid\\-portals/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/rfid\\-portals/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags/[id]",
+      "regex": "^/api/rfid\\-tags/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/rfid\\-tags/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags/[id]/validate",
+      "regex": "^/api/rfid\\-tags/([^/]+?)/validate(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/rfid\\-tags/(?<nxtPid>[^/]+?)/validate(?:/)?$"
+    },
+    {
+      "page": "/api/stock/by-location/[id]",
+      "regex": "^/api/stock/by\\-location/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock/by\\-location/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]",
+      "regex": "^/api/stock\\-documents/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/cancel",
+      "regex": "^/api/stock\\-documents/([^/]+?)/cancel(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/cancel(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/pdf",
+      "regex": "^/api/stock\\-documents/([^/]+?)/pdf(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/pdf(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/photos",
+      "regex": "^/api/stock\\-documents/([^/]+?)/photos(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/photos(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/rectify",
+      "regex": "^/api/stock\\-documents/([^/]+?)/rectify(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/rectify(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/resolve-transfer-dispute",
+      "regex": "^/api/stock\\-documents/([^/]+?)/resolve\\-transfer\\-dispute(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/resolve\\-transfer\\-dispute(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/reverse",
+      "regex": "^/api/stock\\-documents/([^/]+?)/reverse(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/reverse(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/scan",
+      "regex": "^/api/stock\\-documents/([^/]+?)/scan(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/scan(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents/[id]/sign",
+      "regex": "^/api/stock\\-documents/([^/]+?)/sign(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/stock\\-documents/(?<nxtPid>[^/]+?)/sign(?:/)?$"
+    },
+    {
+      "page": "/api/users/[id]",
+      "regex": "^/api/users/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/users/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses/[id]",
+      "regex": "^/api/warehouses/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/warehouses/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses/[id]/zones",
+      "regex": "^/api/warehouses/([^/]+?)/zones(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/warehouses/(?<nxtPid>[^/]+?)/zones(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses/[id]/zones/[zoneId]",
+      "regex": "^/api/warehouses/([^/]+?)/zones/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPzoneId": "nxtPzoneId"
+      },
+      "namedRegex": "^/api/warehouses/(?<nxtPid>[^/]+?)/zones/(?<nxtPzoneId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses/[id]/zones/[zoneId]/locations",
+      "regex": "^/api/warehouses/([^/]+?)/zones/([^/]+?)/locations(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPzoneId": "nxtPzoneId"
+      },
+      "namedRegex": "^/api/warehouses/(?<nxtPid>[^/]+?)/zones/(?<nxtPzoneId>[^/]+?)/locations(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses/[id]/zones/[zoneId]/locations/[locationId]",
+      "regex": "^/api/warehouses/([^/]+?)/zones/([^/]+?)/locations/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPzoneId": "nxtPzoneId",
+        "nxtPlocationId": "nxtPlocationId"
+      },
+      "namedRegex": "^/api/warehouses/(?<nxtPid>[^/]+?)/zones/(?<nxtPzoneId>[^/]+?)/locations/(?<nxtPlocationId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses/[id]/zones/[zoneId]/shelving",
+      "regex": "^/api/warehouses/([^/]+?)/zones/([^/]+?)/shelving(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPzoneId": "nxtPzoneId"
+      },
+      "namedRegex": "^/api/warehouses/(?<nxtPid>[^/]+?)/zones/(?<nxtPzoneId>[^/]+?)/shelving(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses/[id]/zones/[zoneId]/shelving/[nodeId]",
+      "regex": "^/api/warehouses/([^/]+?)/zones/([^/]+?)/shelving/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPzoneId": "nxtPzoneId",
+        "nxtPnodeId": "nxtPnodeId"
+      },
+      "namedRegex": "^/api/warehouses/(?<nxtPid>[^/]+?)/zones/(?<nxtPzoneId>[^/]+?)/shelving/(?<nxtPnodeId>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/audit-logs",
+      "regex": "^/api/audit\\-logs(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/audit\\-logs(?:/)?$"
+    },
+    {
+      "page": "/api/auth/2fa/setup",
+      "regex": "^/api/auth/2fa/setup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/2fa/setup(?:/)?$"
+    },
+    {
+      "page": "/api/auth/2fa/verify",
+      "regex": "^/api/auth/2fa/verify(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/2fa/verify(?:/)?$"
+    },
+    {
+      "page": "/api/auth/login",
+      "regex": "^/api/auth/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/login(?:/)?$"
+    },
+    {
+      "page": "/api/auth/logout",
+      "regex": "^/api/auth/logout(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/logout(?:/)?$"
+    },
+    {
+      "page": "/api/auth/me",
+      "regex": "^/api/auth/me(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/me(?:/)?$"
+    },
+    {
+      "page": "/api/catalog/stats",
+      "regex": "^/api/catalog/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/catalog/stats(?:/)?$"
+    },
+    {
+      "page": "/api/categories",
+      "regex": "^/api/categories(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/categories(?:/)?$"
+    },
+    {
+      "page": "/api/categories/stats",
+      "regex": "^/api/categories/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/categories/stats(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/alerts/run",
+      "regex": "^/api/cdc/alerts/run(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/alerts/run(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/alerts/run-now",
+      "regex": "^/api/cdc/alerts/run\\-now(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/alerts/run\\-now(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/dashboard/overview",
+      "regex": "^/api/cdc/dashboard/overview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/dashboard/overview(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/hr/categories",
+      "regex": "^/api/cdc/hr/categories(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/hr/categories(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/hr/stats",
+      "regex": "^/api/cdc/hr/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/hr/stats(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/kpis",
+      "regex": "^/api/cdc/kpis(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/kpis(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/mobile/offline",
+      "regex": "^/api/cdc/mobile/offline(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/mobile/offline(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/movements/be",
+      "regex": "^/api/cdc/movements/be(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/movements/be(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/movements/bs",
+      "regex": "^/api/cdc/movements/bs(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/movements/bs(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/movements/bt",
+      "regex": "^/api/cdc/movements/bt(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/movements/bt(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/movements/directing-principle",
+      "regex": "^/api/cdc/movements/directing\\-principle(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/movements/directing\\-principle(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/movements/kpis",
+      "regex": "^/api/cdc/movements/kpis(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/movements/kpis(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/movements/rules",
+      "regex": "^/api/cdc/movements/rules(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/movements/rules(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/orders/interdependence",
+      "regex": "^/api/cdc/orders/interdependence(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/orders/interdependence(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/orders/lifecycle",
+      "regex": "^/api/cdc/orders/lifecycle(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/orders/lifecycle(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/orders/stats",
+      "regex": "^/api/cdc/orders/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/orders/stats(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/responsibility/cycle",
+      "regex": "^/api/cdc/responsibility/cycle(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/responsibility/cycle(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/responsibility/holder",
+      "regex": "^/api/cdc/responsibility/holder(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/responsibility/holder(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/traceability/events",
+      "regex": "^/api/cdc/traceability/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/traceability/events(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/traceability/stats",
+      "regex": "^/api/cdc/traceability/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/traceability/stats(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/traceability/users",
+      "regex": "^/api/cdc/traceability/users(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/traceability/users(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/validation/matrix",
+      "regex": "^/api/cdc/validation/matrix(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/validation/matrix(?:/)?$"
+    },
+    {
+      "page": "/api/cdc/validation/overview",
+      "regex": "^/api/cdc/validation/overview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cdc/validation/overview(?:/)?$"
+    },
+    {
+      "page": "/api/dashboard",
+      "regex": "^/api/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/dashboard(?:/)?$"
+    },
+    {
+      "page": "/api/document-archives",
+      "regex": "^/api/document\\-archives(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/document\\-archives(?:/)?$"
+    },
+    {
+      "page": "/api/events",
+      "regex": "^/api/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/events(?:/)?$"
+    },
+    {
+      "page": "/api/handheld/scan",
+      "regex": "^/api/handheld/scan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/handheld/scan(?:/)?$"
+    },
+    {
+      "page": "/api/hardware/devices",
+      "regex": "^/api/hardware/devices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/hardware/devices(?:/)?$"
+    },
+    {
+      "page": "/api/health",
+      "regex": "^/api/health(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/health(?:/)?$"
+    },
+    {
+      "page": "/api/hr/assignments",
+      "regex": "^/api/hr/assignments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/hr/assignments(?:/)?$"
+    },
+    {
+      "page": "/api/hr/daily-workers",
+      "regex": "^/api/hr/daily\\-workers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/hr/daily\\-workers(?:/)?$"
+    },
+    {
+      "page": "/api/hr/daily-workers/export",
+      "regex": "^/api/hr/daily\\-workers/export(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/hr/daily\\-workers/export(?:/)?$"
+    },
+    {
+      "page": "/api/hr/staff",
+      "regex": "^/api/hr/staff(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/hr/staff(?:/)?$"
+    },
+    {
+      "page": "/api/hr/vehicles",
+      "regex": "^/api/hr/vehicles(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/hr/vehicles(?:/)?$"
+    },
+    {
+      "page": "/api/items",
+      "regex": "^/api/items(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/items(?:/)?$"
+    },
+    {
+      "page": "/api/items/bulk",
+      "regex": "^/api/items/bulk(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/items/bulk(?:/)?$"
+    },
+    {
+      "page": "/api/movements",
+      "regex": "^/api/movements(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/movements(?:/)?$"
+    },
+    {
+      "page": "/api/notifications",
+      "regex": "^/api/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notifications(?:/)?$"
+    },
+    {
+      "page": "/api/orders/availability",
+      "regex": "^/api/orders/availability(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/orders/availability(?:/)?$"
+    },
+    {
+      "page": "/api/portique/scan",
+      "regex": "^/api/portique/scan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/portique/scan(?:/)?$"
+    },
+    {
+      "page": "/api/profile",
+      "regex": "^/api/profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/profile(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-handhelds",
+      "regex": "^/api/rfid\\-handhelds(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-handhelds(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-handhelds/stats",
+      "regex": "^/api/rfid\\-handhelds/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-handhelds/stats(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-portals",
+      "regex": "^/api/rfid\\-portals(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-portals(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-portals/stats",
+      "regex": "^/api/rfid\\-portals/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-portals/stats(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-reading-equipment",
+      "regex": "^/api/rfid\\-reading\\-equipment(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-reading\\-equipment(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags",
+      "regex": "^/api/rfid\\-tags(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-tags(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags/catalog",
+      "regex": "^/api/rfid\\-tags/catalog(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-tags/catalog(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags/features",
+      "regex": "^/api/rfid\\-tags/features(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-tags/features(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags/inventory-sample",
+      "regex": "^/api/rfid\\-tags/inventory\\-sample(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-tags/inventory\\-sample(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags/stats",
+      "regex": "^/api/rfid\\-tags/stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-tags/stats(?:/)?$"
+    },
+    {
+      "page": "/api/rfid-tags/typology",
+      "regex": "^/api/rfid\\-tags/typology(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/rfid\\-tags/typology(?:/)?$"
+    },
+    {
+      "page": "/api/search",
+      "regex": "^/api/search(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/search(?:/)?$"
+    },
+    {
+      "page": "/api/settings",
+      "regex": "^/api/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/settings(?:/)?$"
+    },
+    {
+      "page": "/api/setup/seed",
+      "regex": "^/api/setup/seed(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/setup/seed(?:/)?$"
+    },
+    {
+      "page": "/api/stock/by-location",
+      "regex": "^/api/stock/by\\-location(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/stock/by\\-location(?:/)?$"
+    },
+    {
+      "page": "/api/stock-documents",
+      "regex": "^/api/stock\\-documents(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/stock\\-documents(?:/)?$"
+    },
+    {
+      "page": "/api/terrain/documents",
+      "regex": "^/api/terrain/documents(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/terrain/documents(?:/)?$"
+    },
+    {
+      "page": "/api/terrain/incidents",
+      "regex": "^/api/terrain/incidents(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/terrain/incidents(?:/)?$"
+    },
+    {
+      "page": "/api/terrain/my-assignments",
+      "regex": "^/api/terrain/my\\-assignments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/terrain/my\\-assignments(?:/)?$"
+    },
+    {
+      "page": "/api/users",
+      "regex": "^/api/users(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/users(?:/)?$"
+    },
+    {
+      "page": "/api/warehouses",
+      "regex": "^/api/warehouses(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/warehouses(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

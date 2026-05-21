@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppIcon } from "@/components/icons/AppIcon";
 import { RfidHandheldsPanel } from "@/components/RfidHandheldsPanel";
+import { DrawerCloseButton } from "@/components/DrawerCloseButton";
+import { ModalHeader } from "@/components/ModalHeader";
 import { ModalRoot } from "@/components/ModalRoot";
 import { useToastContext } from "@/lib/toast/ToastProvider";
 import { RfidModuleCapabilities } from "@/components/RfidModuleCapabilities";
@@ -692,7 +694,8 @@ export function RfidIdentificationPage({
 
           {detail ? (
             <aside className="rfid-drawer">
-              <div className="rfid-drawer-hd">
+              <div className="rfid-drawer-hd drawer-hd-row">
+                <div className="drawer-hd-main">
                 <div className="rfid-drawer-tag-row">
                   <div className="rfid-drawer-tag">{detail.tagCode}</div>
                   {detail.tagCodeValidatedAt ? (
@@ -719,6 +722,13 @@ export function RfidIdentificationPage({
                     {ASSET_STATUS_LABELS[detail.status]}
                   </span>
                 </div>
+                </div>
+                <DrawerCloseButton
+                  onClick={() => {
+                    setSelectedId(null);
+                    setDetail(null);
+                  }}
+                />
               </div>
               <div className="rfid-drawer-body">
                 <div className="rfid-drawer-meta">
@@ -921,9 +931,15 @@ export function RfidIdentificationPage({
 
       {createOpen ? (
         <ModalRoot isOpen={createOpen} className="rfid-modal-premium">
-          <div className="modal" role="dialog" aria-modal="true">
-            <h3 className="fw500 mb12">Nouvelle unité RFID</h3>
-            <p className="fs13 text-muted mb16">Associez un tag unique à un article du catalogue.</p>
+          <div className="modal modal--form" role="dialog" aria-modal="true" aria-labelledby="rfid-create-title">
+            <ModalHeader
+              icon="rfid"
+              title="Nouvelle unité RFID"
+              subtitle="Associez un tag unique à un article du catalogue."
+              onClose={() => setCreateOpen(false)}
+              titleId="rfid-create-title"
+            />
+            <div className="modal-body">
             <div className="form-grid form-premium">
               <div className="fg full">
                 <label>Article *</label>
@@ -987,6 +1003,7 @@ export function RfidIdentificationPage({
                   ))}
                 </select>
               </div>
+            </div>
             </div>
             <div className="modal-ft">
               <button type="button" className="btn btn-outline" onClick={() => setCreateOpen(false)}>

@@ -1,0 +1,3 @@
+{
+  "/api/cdc/responsibility/[eventId]/route": "app/api/cdc/responsibility/[eventId]/route.js"
+}

@@ -12,6 +12,8 @@ import {
   FormSelect,
   ModalForm,
 } from "@/components/forms/FormPrimitives";
+import { HrPersonnelCategoriesGuide } from "@/components/HrPersonnelCategoriesGuide";
+import { ModuleGuideCollapse } from "@/components/ModuleGuideCollapse";
 import { AppIcon } from "@/components/icons/AppIcon";
 import {
   ROLE_LABELS,
@@ -449,6 +451,10 @@ export function HrModulePage({ events }: HrModulePageProps) {
           </div>
         </div>
       </section>
+
+      <ModuleGuideCollapse title="Catégories de personnel (référence)" className="hr-guide-block">
+        <HrPersonnelCategoriesGuide />
+      </ModuleGuideCollapse>
 
       <div className="hr-kpi-row">
         <div className="hr-kpi hr-kpi--accent">

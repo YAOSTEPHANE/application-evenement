@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { getResponsibilityCycleSpec } from "@/lib/responsibility-db";
-import { getRequestContext } from "@/lib/request-context";
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 
 export async function GET() {
   try {
-    await getRequestContext();
+    await requireAuthenticatedContext();
     return NextResponse.json(getResponsibilityCycleSpec());
-  } catch {
+  } catch (e) {
+    if (e instanceof ApiAuthError) {
+      return NextResponse.json({ message: e.message }, { status: e.status });
+    }
     return NextResponse.json({ message: "Non autorisé" }, { status: 401 });
   }
 }

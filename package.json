@@ -19,10 +19,20 @@
     "dev:backend": "npm run dev --workspace backend",
     "dev:mobile": "npm run dev --prefix mobile",
     "lint": "npm run lint --workspace frontend && npm run lint --workspace backend",
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspace frontend && npm run build --workspace backend",
     "build:frontend": "npm run build --workspace frontend",
     "build:backend": "npm run build --workspace backend",
-    "seed": "npm run seed --workspace frontend"
+    "seed": "npm run seed --workspace frontend",
+    "test": "npm run test --workspace frontend && npm run test --prefix mobile",
+    "test:frontend": "npm run test --workspace frontend",
+    "test:mobile": "npm run test --prefix mobile",
+    "test:all": "npm run test --workspace frontend && npm run test --prefix mobile",
+    "check": "npm run test:all && npm run build",
+    "verify:prisma": "node scripts/verify-prisma-schemas.mjs",
+    "sync:security": "node scripts/sync-security-to-backend.mjs",
+    "quality": "npm run verify:prisma && npm run prisma:generate --workspace frontend && npm run test && npm run sync:security && npm run typecheck --workspace backend",
+    "postinstall": "node scripts/link-backend-to-frontend.mjs",
+    "link:backend": "node scripts/link-backend-to-frontend.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1"

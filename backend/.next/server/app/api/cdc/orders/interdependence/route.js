@@ -1,0 +1,8 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/cdc/orders/interdependence/route.js")
+R.c("server/chunks/[root-of-the-server]__0a34evy._.js")
+R.c("server/chunks/frontend_src_lib_session-token_ts_0e93~fj._.js")
+R.c("server/chunks/_0po6rgy._.js")
+R.c("server/chunks/[root-of-the-server]__0j8-xkl._.js")
+R.c("server/chunks/0x-1__next-internal_server_app_api_cdc_orders_interdependence_route_actions_0wbx~n~.js")
+R.m(84234)
+module.exports=R.m(84234).exports

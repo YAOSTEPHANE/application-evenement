@@ -16,9 +16,6 @@ export async function assertSensitiveActionAllowed(ctx: RequestContext): Promise
   if (!ctx.actorId || !ctx.role) {
     throw new SensitiveAuthError("Session requise", 401);
   }
-  if (ctx.authMethod === "legacy") {
-    return;
-  }
   const user = await prisma.user.findFirst({
     where: { id: ctx.actorId, organizationId: ctx.organizationId },
     select: { twoFactorEnabled: true, role: true },

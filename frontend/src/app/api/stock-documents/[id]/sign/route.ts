@@ -1,26 +1,30 @@
 import { NextResponse } from "next/server";
 
-import { getRequestContext } from "@/lib/request-context";
-import { assertSensitiveActionAllowed, SensitiveAuthError } from "@/lib/require-sensitive-auth";
+import { handleSensitiveIdempotentPost } from "@/lib/api-route-helpers";
 import { signStockDocument, StockDocumentDbError } from "@/lib/stock-document-db";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-export async function POST(_request: Request, { params }: RouteParams) {
+export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const ctx = await getRequestContext();
-    const { organizationId, actorId, role } = ctx;
-    if (!actorId || !role) {
-      return NextResponse.json({ message: "Session requise" }, { status: 401 });
-    }
-    await assertSensitiveActionAllowed(ctx);
     const { id } = await params;
-    const doc = await signStockDocument(organizationId, id, actorId, role);
-    return NextResponse.json(doc);
+    return await handleSensitiveIdempotentPost(
+      request,
+      `stock-documents:sign:${id}`,
+      async (ctx) => {
+        if (!ctx.role) {
+          return { status: 401, body: { message: "Session requise" } };
+        }
+        const doc = await signStockDocument(
+          ctx.organizationId,
+          id,
+          ctx.actorId,
+          ctx.role,
+        );
+        return { status: 200, body: doc };
+      },
+    );
   } catch (error) {
-    if (error instanceof SensitiveAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
-    }
     if (error instanceof StockDocumentDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

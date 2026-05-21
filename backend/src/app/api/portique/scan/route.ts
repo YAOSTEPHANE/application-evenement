@@ -1,20 +1,27 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { handleAuthenticatedIdempotentPost } from "@/lib/api-route-helpers";
 import { portalScanBodySchema, portalScanOptionsFromBody } from "@/lib/rfid-portal-scan";
-import { getRequestContext } from "@/lib/request-context";
 import { StockDocumentDbError, validatePortalScan } from "@/lib/stock-document-db";
 
 export async function POST(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
     const body = portalScanBodySchema.parse(await request.json());
-    const result = await validatePortalScan(
-      organizationId,
-      body.tagCodes,
-      portalScanOptionsFromBody(body),
+    const portalId = body.portalId ?? body.portalCode ?? "default";
+
+    return await handleAuthenticatedIdempotentPost(
+      request,
+      `portique:scan:${portalId}`,
+      async (ctx) => {
+        const result = await validatePortalScan(
+          ctx.organizationId,
+          body.tagCodes,
+          portalScanOptionsFromBody(body),
+        );
+        return { status: result.allowed ? 200 : 422, body: result };
+      },
     );
-    return NextResponse.json(result, { status: result.allowed ? 200 : 422 });
   } catch (error) {
     if (error instanceof StockDocumentDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });

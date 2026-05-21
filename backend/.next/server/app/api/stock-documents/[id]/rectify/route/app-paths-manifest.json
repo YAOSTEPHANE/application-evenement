@@ -1,0 +1,3 @@
+{
+  "/api/stock-documents/[id]/rectify/route": "app/api/stock-documents/[id]/rectify/route.js"
+}

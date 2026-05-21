@@ -2,12 +2,12 @@ import { ItemCondition, NotificationSeverity } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { handleAuthenticatedIdempotentPost } from "@/lib/api-route-helpers";
 import { notifyRoleGroup } from "@/lib/cdc-notification-dispatch";
 import { resolveCustodianAtIncident } from "@/lib/responsibility-db";
 import { resolveAssetStatusFromCondition } from "@/lib/rfid-quarantine";
 import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
@@ -20,90 +20,90 @@ const incidentSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { organizationId, actorId } = await getRequestContext();
-    if (!actorId) {
-      return NextResponse.json({ message: "Connexion requise" }, { status: 401 });
-    }
     const payload = incidentSchema.parse(await request.json());
 
-    let eventName = "";
-    if (payload.eventId) {
-      const ev = await prisma.event.findFirst({
-        where: { id: payload.eventId, organizationId },
-        select: { name: true },
-      });
-      if (!ev) {
-        return NextResponse.json({ message: "Événement introuvable" }, { status: 404 });
-      }
-      eventName = ev.name;
-    }
+    return await handleAuthenticatedIdempotentPost(request, "terrain:incidents", async (ctx) => {
+      const { organizationId, actorId } = ctx;
 
-    const reporter = await prisma.user.findFirst({
-      where: { id: actorId, organizationId },
-      select: { fullName: true },
-    });
-
-    const title =
-      payload.incidentType === "LOSS"
-        ? "Signalement perte matériel"
-        : payload.incidentType === "DAMAGE"
-          ? "Signalement casse matériel"
-          : "Incident terrain";
-
-    let custodianLine = "";
-    if (payload.tagCode) {
-      const custodian = await resolveCustodianAtIncident(
-        organizationId,
-        payload.tagCode,
-      );
-      if (custodian) {
-        custodianLine = `Détenteur au signalement : ${custodian.holderName ?? "—"} (${custodian.phaseTitle}, ${custodian.holderRoleLabel})`;
-      }
-    }
-
-    const body = [
-      reporter?.fullName ?? "Technicien",
-      eventName ? `· ${eventName}` : "",
-      payload.tagCode ? `· Tag ${payload.tagCode.toUpperCase()}` : "",
-      custodianLine,
-      `— ${payload.description}`,
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    await prisma.$transaction(async (tx) => {
-      if (payload.tagCode) {
-        const asset = await tx.trackedAsset.findFirst({
-          where: { organizationId, tagCode: payload.tagCode.toUpperCase() },
-          select: { id: true, status: true },
+      let eventName = "";
+      if (payload.eventId) {
+        const ev = await prisma.event.findFirst({
+          where: { id: payload.eventId, organizationId },
+          select: { name: true },
         });
-        if (asset) {
-          const condition =
-            payload.incidentType === "LOSS"
-              ? ItemCondition.OBSOLETE
-              : ItemCondition.NEEDS_REPAIR;
-          await tx.trackedAsset.update({
-            where: { id: asset.id },
-            data: {
-              condition,
-              status: resolveAssetStatusFromCondition(condition, asset.status),
-            },
-          });
+        if (!ev) {
+          return { status: 404, body: { message: "Événement introuvable" } };
+        }
+        eventName = ev.name;
+      }
+
+      const reporter = await prisma.user.findFirst({
+        where: { id: actorId, organizationId },
+        select: { fullName: true },
+      });
+
+      const title =
+        payload.incidentType === "LOSS"
+          ? "Signalement perte matériel"
+          : payload.incidentType === "DAMAGE"
+            ? "Signalement casse matériel"
+            : "Incident terrain";
+
+      let custodianLine = "";
+      if (payload.tagCode) {
+        const custodian = await resolveCustodianAtIncident(organizationId, payload.tagCode);
+        if (custodian) {
+          custodianLine = `Détenteur au signalement : ${custodian.holderName ?? "—"} (${custodian.phaseTitle}, ${custodian.holderRoleLabel})`;
         }
       }
 
-      await notifyRoleGroup(tx, organizationId, ["TECHNICAL_MANAGER", "ADMIN", "STOREKEEPER"], {
-        module: "alertes",
-        title,
-        body,
-        targetType: payload.eventId ? "Event" : "Incident",
-        targetId: payload.eventId,
-        severity: payload.incidentType === "LOSS" ? "URGENT" : "WARNING",
-        channels: ["IN_APP", "EMAIL", "WHATSAPP"],
-      });
-    });
+      const body = [
+        reporter?.fullName ?? "Technicien",
+        eventName ? `· ${eventName}` : "",
+        payload.tagCode ? `· Tag ${payload.tagCode.toUpperCase()}` : "",
+        custodianLine,
+        `— ${payload.description}`,
+      ]
+        .filter(Boolean)
+        .join(" ");
 
-    return NextResponse.json({ ok: true, message: "Incident transmis" }, { status: 201 });
+      await prisma.$transaction(async (tx) => {
+        if (payload.tagCode) {
+          const asset = await tx.trackedAsset.findFirst({
+            where: { organizationId, tagCode: payload.tagCode.toUpperCase() },
+            select: { id: true, status: true },
+          });
+          if (asset) {
+            const condition =
+              payload.incidentType === "LOSS"
+                ? ItemCondition.OBSOLETE
+                : ItemCondition.NEEDS_REPAIR;
+            await tx.trackedAsset.update({
+              where: { id: asset.id },
+              data: {
+                condition,
+                status: resolveAssetStatusFromCondition(condition, asset.status),
+              },
+            });
+          }
+        }
+
+        await notifyRoleGroup(tx, organizationId, ["TECHNICAL_MANAGER", "ADMIN", "STOREKEEPER"], {
+          module: "alertes",
+          title,
+          body,
+          targetType: payload.eventId ? "Event" : "Incident",
+          targetId: payload.eventId,
+          severity:
+            payload.incidentType === "LOSS"
+              ? NotificationSeverity.URGENT
+              : NotificationSeverity.WARNING,
+          channels: ["IN_APP", "EMAIL", "WHATSAPP"],
+        });
+      });
+
+      return { status: 201, body: { ok: true, message: "Incident transmis" } };
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: "Payload invalide" }, { status: 400 });

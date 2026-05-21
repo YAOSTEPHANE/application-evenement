@@ -15,7 +15,9 @@
     "seed": "npm run prisma:generate && node scripts/run-seed-once.mjs",
     "seed:cdc": "npm run prisma:generate && npx tsx scripts/seed-cdc-demo.mjs",
     "prisma:backfill-categories": "node scripts/backfill-category-codes.mjs",
-    "prisma:dedupe-categories": "node scripts/dedupe-categories.mjs"
+    "prisma:dedupe-categories": "node scripts/dedupe-categories.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
@@ -42,6 +44,7 @@
     "eslint-config-next": "16.2.1",
     "prisma": "^6.16.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

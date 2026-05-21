@@ -2,8 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { apiFetch } from "@/lib/api";
 import { replaceOfflineDraftId, type CachedDocument } from "@/lib/offline-cache";
+import {
+  newOfflineTempDocumentId,
+  resolveOfflineDocumentId,
+} from "@/lib/offline-id";
 
 const STORAGE_KEY = "cdc_offline_queue_v1";
+
+/** Au-delà de ce seuil, l’action reste en file mais n’est plus rejouée automatiquement. */
+export const OFFLINE_MAX_ATTEMPTS = 8;
 
 export type OfflineActionType =
   | "create_document"
@@ -17,12 +24,11 @@ export type OfflineActionType =
 export type OfflineAction = {
   id: string;
   type: OfflineActionType;
-  /** Identifiant serveur ou temporaire (`temp_…`) pour scan/sign. */
   documentId?: string;
   payload: Record<string, unknown>;
   createdAt: string;
-  /** Pour create_document : même valeur que documentId temporaire. */
   clientTempId?: string;
+  idempotencyKey: string;
   lastError?: string;
   attempts?: number;
 };
@@ -30,6 +36,7 @@ export type OfflineAction = {
 type FlushResult = {
   synced: number;
   failed: number;
+  skipped: number;
   idMap: Record<string, string>;
 };
 
@@ -67,20 +74,40 @@ async function writeQueue(items: OfflineAction[]): Promise<void> {
   notifyQueueChanged();
 }
 
-export function newOfflineTempDocumentId(): string {
-  return `temp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+function buildIdempotencyKey(
+  action: Omit<OfflineAction, "id" | "createdAt" | "attempts" | "idempotencyKey">,
+): string {
+  if (action.clientTempId) {
+    return `${action.type}:${action.clientTempId}`;
+  }
+  if (action.documentId) {
+    return `${action.type}:${action.documentId}`;
+  }
+  return `${action.type}:${JSON.stringify(action.payload).slice(0, 120)}`;
 }
 
+function apiHeadersForAction(action: OfflineAction): Record<string, string> {
+  return { "Idempotency-Key": action.idempotencyKey };
+}
+
+export { newOfflineTempDocumentId } from "@/lib/offline-id";
+
 export async function enqueueOfflineAction(
-  action: Omit<OfflineAction, "id" | "createdAt" | "attempts">,
+  action: Omit<OfflineAction, "id" | "createdAt" | "attempts" | "idempotencyKey">,
 ): Promise<OfflineAction> {
+  const idempotencyKey = buildIdempotencyKey(action);
+  const q = await readQueue();
+  const existing = q.find((a) => a.idempotencyKey === idempotencyKey);
+  if (existing) {
+    return existing;
+  }
   const entry: OfflineAction = {
     ...action,
     id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     createdAt: new Date().toISOString(),
     attempts: 0,
+    idempotencyKey,
   };
-  const q = await readQueue();
   q.push(entry);
   await writeQueue(q);
   return entry;
@@ -94,6 +121,13 @@ export async function clearOfflineAction(id: string): Promise<void> {
   await writeQueue((await readQueue()).filter((a) => a.id !== id));
 }
 
+export async function resetOfflineActionAttempts(id: string): Promise<void> {
+  const q = await readQueue();
+  await writeQueue(
+    q.map((a) => (a.id === id ? { ...a, attempts: 0, lastError: undefined } : a)),
+  );
+}
+
 async function markActionFailed(id: string, error: string): Promise<void> {
   const q = await readQueue();
   const next = q.map((a) =>
@@ -104,14 +138,6 @@ async function markActionFailed(id: string, error: string): Promise<void> {
   await writeQueue(next);
 }
 
-function resolveDocumentId(
-  documentId: string | undefined,
-  idMap: Record<string, string>,
-): string | undefined {
-  if (!documentId) return undefined;
-  return idMap[documentId] ?? documentId;
-}
-
 async function applyCreateDocument(
   action: OfflineAction,
   idMap: Record<string, string>,
@@ -119,6 +145,7 @@ async function applyCreateDocument(
   const payload = action.payload;
   const res = await apiFetch("/api/terrain/documents", {
     method: "POST",
+    headers: apiHeadersForAction(action),
     body: JSON.stringify(payload),
   });
   const data = (await res.json().catch(() => ({}))) as {
@@ -155,7 +182,7 @@ async function applyScan(
   action: OfflineAction,
   idMap: Record<string, string>,
 ): Promise<boolean> {
-  const docId = resolveDocumentId(action.documentId, idMap);
+  const docId = resolveOfflineDocumentId(action.documentId, idMap);
   if (!docId) {
     await markActionFailed(action.id, "Bon introuvable après sync");
     return false;
@@ -169,7 +196,11 @@ async function applyScan(
     typeof handheldId === "string" && handheldId
       ? { tagCodes: action.payload.tagCodes, documentId: docId, handheldId }
       : { ...action.payload, tagCodes: action.payload.tagCodes };
-  const res = await apiFetch(url, { method: "POST", body: JSON.stringify(body) });
+  const res = await apiFetch(url, {
+    method: "POST",
+    headers: apiHeadersForAction(action),
+    body: JSON.stringify(body),
+  });
   const data = (await res.json().catch(() => ({}))) as { message?: string };
   if (!res.ok) {
     await markActionFailed(action.id, data.message ?? `HTTP ${res.status}`);
@@ -183,12 +214,15 @@ async function applySign(
   action: OfflineAction,
   idMap: Record<string, string>,
 ): Promise<boolean> {
-  const docId = resolveDocumentId(action.documentId, idMap);
+  const docId = resolveOfflineDocumentId(action.documentId, idMap);
   if (!docId) {
     await markActionFailed(action.id, "Bon introuvable après sync");
     return false;
   }
-  const res = await apiFetch(`/api/stock-documents/${docId}/sign`, { method: "POST" });
+  const res = await apiFetch(`/api/stock-documents/${docId}/sign`, {
+    method: "POST",
+    headers: apiHeadersForAction(action),
+  });
   const data = (await res.json().catch(() => ({}))) as { message?: string };
   if (!res.ok) {
     await markActionFailed(action.id, data.message ?? `HTTP ${res.status}`);
@@ -208,7 +242,10 @@ async function applyEventLifecycle(action: OfflineAction): Promise<boolean> {
     action.type === "event_loading"
       ? `/api/events/${eventId}/loading`
       : `/api/events/${eventId}/be-ret`;
-  const res = await apiFetch(path, { method: "POST" });
+  const res = await apiFetch(path, {
+    method: "POST",
+    headers: apiHeadersForAction(action),
+  });
   const data = (await res.json().catch(() => ({}))) as { message?: string; documentNumber?: string };
   if (!res.ok) {
     await markActionFailed(action.id, data.message ?? `HTTP ${res.status}`);
@@ -221,6 +258,7 @@ async function applyEventLifecycle(action: OfflineAction): Promise<boolean> {
 async function applyIncident(action: OfflineAction): Promise<boolean> {
   const res = await apiFetch("/api/terrain/incidents", {
     method: "POST",
+    headers: apiHeadersForAction(action),
     body: JSON.stringify(action.payload),
   });
   const data = (await res.json().catch(() => ({}))) as { message?: string };
@@ -235,6 +273,7 @@ async function applyIncident(action: OfflineAction): Promise<boolean> {
 async function applyPortique(action: OfflineAction): Promise<boolean> {
   const res = await apiFetch("/api/portique/scan", {
     method: "POST",
+    headers: apiHeadersForAction(action),
     body: JSON.stringify(action.payload),
   });
   const data = (await res.json().catch(() => ({}))) as { message?: string };
@@ -246,14 +285,18 @@ async function applyPortique(action: OfflineAction): Promise<boolean> {
   return true;
 }
 
-/** Rejoue la file dans l'ordre FIFO ; les actions en échec restent en file. */
 export async function flushOfflineQueue(): Promise<FlushResult> {
   const idMap: Record<string, string> = {};
   let synced = 0;
   let failed = 0;
+  let skipped = 0;
   const queue = await readQueue();
 
   for (const action of queue) {
+    if ((action.attempts ?? 0) >= OFFLINE_MAX_ATTEMPTS) {
+      skipped += 1;
+      continue;
+    }
     try {
       let ok = false;
       if (action.type === "create_document") {
@@ -285,9 +328,9 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
   if (Object.keys(idMap).length > 0) {
     const remaining = await readQueue();
     const remapped = remaining.map((a) => {
-      const docId = a.documentId ? resolveDocumentId(a.documentId, idMap) : a.documentId;
+      const docId = a.documentId ? resolveOfflineDocumentId(a.documentId, idMap) : a.documentId;
       const clientTempId = a.clientTempId
-        ? resolveDocumentId(a.clientTempId, idMap)
+        ? resolveOfflineDocumentId(a.clientTempId, idMap)
         : a.clientTempId;
       if (docId === a.documentId && clientTempId === a.clientTempId) return a;
       return { ...a, documentId: docId, clientTempId };
@@ -295,5 +338,5 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
     await writeQueue(remapped);
   }
 
-  return { synced, failed, idMap };
+  return { synced, failed, skipped, idMap };
 }

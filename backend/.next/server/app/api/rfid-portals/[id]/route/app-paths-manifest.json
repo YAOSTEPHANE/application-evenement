@@ -1,0 +1,3 @@
+{
+  "/api/rfid-portals/[id]/route": "app/api/rfid-portals/[id]/route.js"
+}

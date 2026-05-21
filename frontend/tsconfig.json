@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "gge.tsx"]
+  "exclude": ["node_modules", "gge.tsx", "**/*.test.ts", "**/*.test.tsx"]
 }

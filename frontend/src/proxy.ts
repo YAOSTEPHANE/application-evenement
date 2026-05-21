@@ -2,6 +2,8 @@ import { jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { proxyAllowsSeed } from "@/lib/api-auth";
+import { isProductionEnv } from "@/lib/env-runtime";
 import { getJwtSecretKey, SESSION_COOKIE_NAME } from "@/lib/session-token";
 
 /**
@@ -20,7 +22,6 @@ function parseAllowedOrigins(): string[] {
   return ["http://localhost:3000", "http://127.0.0.1:3000"];
 }
 
-/** Hôtes candidats pour la requête (évite un faux « cross-origin » si seul x-forwarded-host est incohérent). */
 function requestHostnames(request: NextRequest): string[] {
   const seen = new Set<string>();
   const forwarded = request.headers.get("x-forwarded-host");
@@ -43,10 +44,6 @@ function requestHostnames(request: NextRequest): string[] {
   return [...seen];
 }
 
-/**
- * Même origine (monolithe Next sur Vercel, etc.) : le navigateur envoie Origin = l’URL du site,
- * qui doit être autorisée même si CORS_ALLOWED_ORIGINS n’est pas encore configuré (sinon 403 sur /api/auth/login en prod).
- */
 function isSameOriginAsRequest(request: NextRequest, origin: string): boolean {
   try {
     const originHost = new URL(origin).hostname;
@@ -81,7 +78,7 @@ function applyApiCors(request: NextRequest, response: NextResponse): NextRespons
   );
   response.headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, x-organization-id, x-actor-id, Cookie",
+    "Content-Type, Authorization, Idempotency-Key, idempotency-key, x-organization-id, x-actor-id, Cookie",
   );
   response.headers.set("Access-Control-Max-Age", "86400");
 
@@ -101,7 +98,6 @@ function originForbidden(request: NextRequest): boolean {
   }
   const raw = process.env.CORS_ALLOWED_ORIGINS?.trim();
   if (!raw) {
-    // Sans liste explicite, la liste par défaut (localhost) ne doit pas bloquer la prod (monolithe / Vercel).
     return false;
   }
   const explicit = raw
@@ -115,13 +111,13 @@ function isPublicApiPath(pathname: string): boolean {
   if (pathname === "/api/auth/login") return true;
   if (pathname === "/api/auth/logout") return true;
   if (pathname === "/api/health") return true;
-  if (pathname.startsWith("/api/setup/seed")) return true;
+  if (pathname === "/api/auth/2fa/verify") return true;
   if (pathname === "/api/cdc/alerts/run") return true;
   return false;
 }
 
-function legacyHeadersAllowed(request: NextRequest): boolean {
-  if (process.env.NODE_ENV === "production") {
+function legacyHeadersAllowed(): boolean {
+  if (isProductionEnv()) {
     return process.env.ALLOW_LEGACY_API_HEADERS === "true";
   }
   return process.env.ALLOW_LEGACY_API_HEADERS !== "false";
@@ -164,12 +160,26 @@ export async function proxy(request: NextRequest) {
   }
 
   let res: NextResponse;
-  if (isPublicApiPath(pathname)) {
+
+  if (pathname.startsWith("/api/setup/seed")) {
+    if (!proxyAllowsSeed(request)) {
+      res = NextResponse.json(
+        {
+          message: isProductionEnv()
+            ? "Seed production : Authorization Bearer {SEED_SECRET} requis."
+            : "Seed non autorisé.",
+        },
+        { status: isProductionEnv() ? 401 : 503 },
+      );
+    } else {
+      res = NextResponse.next();
+    }
+  } else if (isPublicApiPath(pathname)) {
     res = NextResponse.next();
   } else {
     const okSession = await hasValidSession(request);
     const okLegacy =
-      legacyHeadersAllowed(request) && Boolean(request.headers.get("x-actor-id"));
+      legacyHeadersAllowed() && Boolean(request.headers.get("x-actor-id"));
 
     if (okSession || okLegacy) {
       res = NextResponse.next();

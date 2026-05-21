@@ -1,0 +1,3 @@
+{
+  "/api/rfid-portals/by-code/[code]/scan/route": "app/api/rfid-portals/by-code/[code]/scan/route.js"
+}

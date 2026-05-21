@@ -1,13 +1,11 @@
 "use client";
 
-import { Role } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
 
 import { AppIcon } from "@/components/icons/AppIcon";
-import { clientFetch, fetchAuthMe } from "@/lib/stock/api";
+import { clientFetch } from "@/lib/stock/api";
 import { dispo, fmtNum } from "@/lib/stock/helpers";
 import type { Article } from "@/lib/stock/types";
-import { useToastContext } from "@/lib/toast/ToastProvider";
 
 type NotificationRow = {
   id: string;
@@ -33,13 +31,10 @@ export function AlertsModulePage({
   onEditArticle,
   onOrderArticle,
 }: AlertsModulePageProps) {
-  const { showToast } = useToastContext();
   const [tab, setTab] = useState<TabId>("metier");
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [counts, setCounts] = useState({ urgent: 0, warning: 0, unread: 0 });
   const [loading, setLoading] = useState(false);
-  const [canRunAlerts, setCanRunAlerts] = useState(false);
-  const [runningAlerts, setRunningAlerts] = useState(false);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -59,9 +54,6 @@ export function AlertsModulePage({
 
   useEffect(() => {
     void loadNotifications();
-    void fetchAuthMe().then((me) => {
-      setCanRunAlerts(me?.role === Role.ADMIN || me?.role === Role.MANAGER);
-    });
   }, [loadNotifications]);
 
   async function markRead(id: string) {
@@ -71,33 +63,6 @@ export function AlertsModulePage({
       body: JSON.stringify({ id }),
     });
     await loadNotifications();
-  }
-
-  async function runScheduledAlerts() {
-    setRunningAlerts(true);
-    try {
-      const res = await clientFetch("/api/cdc/alerts/run-now", { method: "POST" });
-      const data = (await res.json().catch(() => ({}))) as { message?: string } & Record<string, number>;
-      if (!res.ok) {
-        showToast(data.message ?? "Échec du cycle d'alertes", "danger");
-        return;
-      }
-      const total =
-        (data.returnEveAlerts ?? 0) +
-        (data.overdueReturnAlerts ?? 0) +
-        (data.staleTransferAlerts ?? 0) +
-        (data.pendingSignatureAlerts ?? 0) +
-        (data.pendingBsAlerts ?? 0) +
-        (data.disputedAlerts ?? 0);
-      showToast(
-        total > 0
-          ? `${total} notification(s) métier générée(s).`
-          : "Cycle terminé — aucune nouvelle alerte à émettre.",
-      );
-      await loadNotifications();
-    } finally {
-      setRunningAlerts(false);
-    }
   }
 
   return (
@@ -120,16 +85,6 @@ export function AlertsModulePage({
           >
             ↻ Actualiser
           </button>
-          {canRunAlerts && tab === "metier" ? (
-            <button
-              className="btn btn-gold btn-sm"
-              type="button"
-              disabled={runningAlerts}
-              onClick={() => void runScheduledAlerts()}
-            >
-              {runningAlerts ? "Analyse…" : "Lancer le cycle CDC"}
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -191,7 +146,7 @@ export function AlertsModulePage({
               <h3>Aucune notification métier</h3>
               <p>
                 Les alertes planifiées (retour J+1, signatures en attente, transferts bloqués) apparaissent
-                ici. Un administrateur peut lancer le cycle manuellement.
+                ici lorsque le cycle CDC est exécuté (planification serveur).
               </p>
             </div>
           ) : null}

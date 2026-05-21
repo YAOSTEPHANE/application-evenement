@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getRequestContext } from "@/lib/request-context";
-import { assertSensitiveActionAllowed, SensitiveAuthError } from "@/lib/require-sensitive-auth";
+import { handleSensitiveIdempotentPost } from "@/lib/api-route-helpers";
 import {
   createTerrainDocumentFromTags,
   terrainCreateDocumentSchema,
@@ -11,32 +10,27 @@ import { StockDocumentDbError } from "@/lib/stock-document-db";
 
 export async function POST(request: Request) {
   try {
-    const ctx = await getRequestContext();
-    if (!ctx.actorId || !ctx.role) {
-      return NextResponse.json({ message: "Connexion requise" }, { status: 401 });
-    }
-    await assertSensitiveActionAllowed(ctx);
-    const body = await request.json();
-    const parsed = terrainCreateDocumentSchema.parse(body);
-    const doc = await createTerrainDocumentFromTags(
-      ctx.organizationId,
-      parsed,
-      ctx.role,
-    );
-    return NextResponse.json(
-      {
-        id: doc.id,
-        documentNumber: doc.documentNumber,
-        kind: doc.kind,
-        status: doc.status,
-        clientTempId: parsed.clientTempId ?? null,
-      },
-      { status: 201 },
-    );
+    const rawBody = await request.json();
+    const parsed = terrainCreateDocumentSchema.parse(rawBody);
+
+    return await handleSensitiveIdempotentPost(request, "terrain:documents", async (ctx) => {
+      const doc = await createTerrainDocumentFromTags(
+        ctx.organizationId,
+        parsed,
+        ctx.role ?? undefined,
+      );
+      return {
+        status: 201,
+        body: {
+          id: doc.id,
+          documentNumber: doc.documentNumber,
+          kind: doc.kind,
+          status: doc.status,
+          clientTempId: parsed.clientTempId ?? null,
+        },
+      };
+    });
   } catch (error) {
-    if (error instanceof SensitiveAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
-    }
     if (error instanceof StockDocumentDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

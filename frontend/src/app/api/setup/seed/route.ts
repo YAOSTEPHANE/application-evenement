@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { ApiAuthError, assertSeedRequestAllowed } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { SEED_IDS, seedDemoData } from "@/lib/seed-test-data";
 
@@ -11,13 +12,14 @@ const ADMIN_ID = SEED_IDS.userAdmin;
 
 const bodySchema = z
   .object({
-    /** Si true (défaut) : organisation + utilisateurs + catégories + articles + événements + affectations + 2 mouvements. */
     demo: z.boolean().optional(),
   })
   .optional();
 
 export async function POST(request: Request) {
   try {
+    assertSeedRequestAllowed(request);
+
     let demo = true;
     try {
       const json = await request.json();
@@ -85,10 +87,12 @@ export async function POST(request: Request) {
       },
     });
   } catch (e) {
-    console.error("[seed]", e);
+    if (e instanceof ApiAuthError) {
+      return NextResponse.json({ message: e.message }, { status: e.status });
+    }
     return NextResponse.json(
       { message: "Erreur pendant le seed (voir les logs serveur)." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

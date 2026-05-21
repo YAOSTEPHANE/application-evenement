@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getRequestContext } from "@/lib/request-context";
+import { handleAuthenticatedIdempotentPost } from "@/lib/api-route-helpers";
 import { recordDocumentScan, StockDocumentDbError } from "@/lib/stock-document-db";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const { organizationId } = await getRequestContext();
     const { id } = await params;
     const body = await request.json();
-    const doc = await recordDocumentScan(organizationId, id, body);
-    return NextResponse.json(doc);
+    return await handleAuthenticatedIdempotentPost(
+      request,
+      `stock-documents:scan:${id}`,
+      async (ctx) => {
+        const doc = await recordDocumentScan(ctx.organizationId, id, body);
+        return { status: 200, body: doc };
+      },
+    );
   } catch (error) {
     if (error instanceof StockDocumentDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });

@@ -1,20 +1,27 @@
 import { NextResponse } from "next/server";
 
+import { handleAuthenticatedIdempotentPost } from "@/lib/api-route-helpers";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
 import { startEventLoading, StockDocumentDbError } from "@/lib/stock-document-db";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-export async function POST(_request: Request, { params }: RouteParams) {
+/** Chargement : génération automatique du BS-EVT (commande → sortie matériel). */
+export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
-    const doc = await startEventLoading(organizationId, id);
-    return NextResponse.json(doc, { status: 201 });
+
+    return await handleAuthenticatedIdempotentPost(
+      request,
+      `events:loading:${id}`,
+      async (ctx) => {
+        const doc = await startEventLoading(ctx.organizationId, id);
+        return { status: 201, body: doc };
+      },
+    );
   } catch (error) {
     if (error instanceof StockDocumentDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });

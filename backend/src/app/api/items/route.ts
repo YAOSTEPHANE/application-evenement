@@ -69,21 +69,30 @@ function serializeItemWithVariants(
 }
 
 export async function GET() {
-  const { organizationId } = await getRequestContext();
+  try {
+    const { organizationId } = await getRequestContext();
 
-  const items = await prisma.item.findMany({
-    where: { organizationId },
-    select: {
-      ...ITEM_PUBLIC_SELECT,
-      variants: {
-        select: VARIANT_PUBLIC_SELECT,
-        orderBy: [{ sortOrder: "asc" }, { reference: "asc" }],
+    const items = await prisma.item.findMany({
+      where: { organizationId },
+      select: {
+        ...ITEM_PUBLIC_SELECT,
+        variants: {
+          select: VARIANT_PUBLIC_SELECT,
+          orderBy: [{ sortOrder: "asc" }, { reference: "asc" }],
+        },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    });
 
-  return NextResponse.json(items.map(serializeItemWithVariants));
+    return NextResponse.json(items.map(serializeItemWithVariants));
+  } catch (error) {
+    console.error("[GET /api/items]", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Impossible de charger les articles";
+    return NextResponse.json({ message }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {

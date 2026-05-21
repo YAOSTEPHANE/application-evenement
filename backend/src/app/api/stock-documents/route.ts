@@ -2,6 +2,7 @@ import { StockDocumentKind, StockDocumentStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { assertSensitiveActionAllowed, SensitiveAuthError } from "@/lib/require-sensitive-auth";
 import { getRequestContext } from "@/lib/request-context";
 import {
   createStockDocument,
@@ -32,11 +33,18 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const ctx = await getRequestContext();
+    const { organizationId, role } = ctx;
     const body = await request.json();
-    const doc = await createStockDocument(organizationId, body);
+    if (body?.kind === "BS" || body?.kind === "BT") {
+      await assertSensitiveActionAllowed(ctx);
+    }
+    const doc = await createStockDocument(organizationId, body, role ?? undefined);
     return NextResponse.json(doc, { status: 201 });
   } catch (error) {
+    if (error instanceof SensitiveAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof StockDocumentDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

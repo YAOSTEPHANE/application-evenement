@@ -6,6 +6,7 @@ export const colors = {
   gold2: "#e8b86a",
   bg: "#0a111c",
   surface: "rgba(255,255,255,0.06)",
+  surface2: "rgba(255,255,255,0.09)",
   surfaceSolid: "#141f30",
   glassBorder: "rgba(255,255,255,0.1)",
   text: "#f0f4fa",
