@@ -17,6 +17,8 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+import { formatTagCode } from "./tag-nomenclature";
+
 /** IDs fixes 24 hex (ObjectId) pour un seed idempotent. */
 export const SEED_IDS = {
   organization: "000000000000000000000001",
@@ -1238,10 +1240,13 @@ export async function seedDemoData(prisma: PrismaClient) {
     data: { orderStatus: OrderStatus.IN_PROGRESS },
   });
 
-  const demoTagCode = "TAG-MOB-0001";
+  const demoTagCode = formatTagCode("MOB-CHR-NAP", 1);
   await prisma.trackedAsset.upsert({
-    where: { organizationId_tagCode: { organizationId: orgId, tagCode: demoTagCode } },
+    where: { id: SEED_IDS.tagChaise1 },
     update: {
+      tagCode: demoTagCode,
+      tagCodeValidatedAt: null,
+      tagCodeValidatedByUserId: null,
       itemId: SEED_IDS.itemChaise,
       rfidTagType: RfidTagType.ADHESIVE,
       status: TrackedAssetStatus.AVAILABLE,

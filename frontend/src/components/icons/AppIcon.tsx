@@ -34,7 +34,8 @@ export type AppIconName =
   | "check"
   | "alert"
   | "close"
-  | "upload";
+  | "upload"
+  | "settings";
 
 type AppIconProps = SVGProps<SVGSVGElement> & {
   name: AppIconName;
@@ -242,6 +243,12 @@ const paths: Record<AppIconName, React.ReactNode> = {
   upload: (
     <>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+    </>
+  ),
+  settings: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
     </>
   ),
 };

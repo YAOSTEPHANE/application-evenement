@@ -76,6 +76,7 @@ export type ValidationDocScenario = {
   kind: StockDocumentKind;
   beSubtype?: BeSubtype;
   bsSubtype?: BsSubtype;
+  btSubtype?: BtSubtype;
 };
 
 export const VALIDATION_DOC_SCENARIOS: ValidationDocScenario[] = [
@@ -84,6 +85,10 @@ export const VALIDATION_DOC_SCENARIOS: ValidationDocScenario[] = [
   { id: "bs", label: "Bon BS (sortie)", kind: StockDocumentKind.BS },
   { id: "bs-evt", label: "Bon BS événement", kind: StockDocumentKind.BS, bsSubtype: BsSubtype.BS_EVT },
   { id: "bt", label: "Bon BT (transfert)", kind: StockDocumentKind.BT },
+  { id: "bt-ee", label: "BT-EE entrepôt → entrepôt", kind: StockDocumentKind.BT, btSubtype: BtSubtype.BT_EE },
+  { id: "bt-es", label: "BT-ES entrepôt → site", kind: StockDocumentKind.BT, btSubtype: BtSubtype.BT_ES },
+  { id: "bt-ss", label: "BT-SS site → site", kind: StockDocumentKind.BT, btSubtype: BtSubtype.BT_SS },
+  { id: "bt-se", label: "BT-SE site → entrepôt", kind: StockDocumentKind.BT, btSubtype: BtSubtype.BT_SE },
 ];
 
 export type SensitiveActionDef = {
@@ -137,6 +142,7 @@ export function canCancelStockDocument(role: Role): boolean {
   return role === "ADMIN" || role === "MANAGER" || role === "STOREKEEPER";
 }
 
+/** Plan complet affiché (UI, matrice) — inclut les 2 signatures BT. */
 export function documentSignPlan(
   kind: StockDocumentKind,
   opts: {

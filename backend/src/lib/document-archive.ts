@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { renderStockDocumentHtml } from "@/lib/stock-document-html";
 import type { getStockDocument } from "@/lib/stock-document-db";
-import { archiveRetentionUntil, hashDocumentContent } from "@/lib/cdc-stock-document-rules";
+import { archiveRetentionUntil, hashDocumentContent } from "@/lib/totp-auth";
 
 type Doc = Awaited<ReturnType<typeof getStockDocument>>;
 

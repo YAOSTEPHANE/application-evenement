@@ -3,8 +3,9 @@ import { z } from "zod";
 
 import {
   ITEM_PUBLIC_SELECT,
-  itemCreateSchema,
+  itemWriteBaseSchema,
   normalizeItemPayload,
+  refineStockLevels,
   serializeItemRow,
 } from "@/lib/item-helpers";
 import {
@@ -19,13 +20,14 @@ import { getRequestContext } from "@/lib/request-context";
 
 const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
-const createItemSchema = itemCreateSchema
+const createItemSchema = itemWriteBaseSchema
   .extend({
     categoryId: objectId,
     totalQuantity: z.number().int().nonnegative(),
     hasVariants: z.boolean().optional(),
     variants: z.array(variantWriteSchema).max(50).optional(),
   })
+  .superRefine(refineStockLevels)
   .superRefine((data, ctx) => {
     if (data.hasVariants) {
       if (!data.variants?.length) {

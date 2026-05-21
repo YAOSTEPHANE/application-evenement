@@ -10,6 +10,7 @@ type TopbarProps = {
   userAvatarUrl?: string;
   onOpenAlerts?: () => void;
   onOpenProfile?: () => void;
+  onOpenSettings?: () => void;
   onSearchChange?: (value: string) => void;
   themeMode?: "light" | "dark";
   onToggleTheme?: () => void;
@@ -21,6 +22,7 @@ export function Topbar({
   userAvatarUrl = "",
   onOpenAlerts,
   onOpenProfile,
+  onOpenSettings,
   onSearchChange,
   themeMode = "light",
   onToggleTheme,
@@ -61,6 +63,10 @@ export function Topbar({
         <button type="button" className="icon-btn" onClick={() => onOpenAlerts?.()} title="Alertes">
           <AppIcon name="alerts" size={18} />
           <span className="notif-dot" id="notifDot" aria-hidden="true" />
+        </button>
+
+        <button type="button" className="icon-btn" onClick={() => onOpenSettings?.()} title="Paramètres">
+          <AppIcon name="settings" size={18} />
         </button>
 
         <button type="button" className="user-chip" onClick={() => onOpenProfile?.()}>

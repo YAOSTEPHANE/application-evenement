@@ -1,6 +1,7 @@
 import {
   BeSubtype,
   BsSubtype,
+  BtSubtype,
   BtTransitPhase,
   StockDocumentKind,
   StockDocumentStatus,
@@ -9,7 +10,7 @@ import {
 
 import { roleRequires2Fa } from "@/lib/cdc-labels";
 import {
-  signSlotsForDocument,
+  documentSignPlan,
   totalSignaturesRequired,
   type SignSlot,
 } from "@/lib/cdc-validation-matrix";
@@ -65,10 +66,11 @@ function nextSignSlot(
   opts: {
     bsSubtype?: BsSubtype | null;
     beSubtype?: BeSubtype | null;
+    btSubtype?: BtSubtype | null;
     btTransitPhase?: BtTransitPhase | null;
   },
 ): SignSlot | null {
-  const slots = signSlotsForDocument(kind, opts);
+  const slots = documentSignPlan(kind, opts);
   return slots[signatureCount] ?? null;
 }
 
@@ -149,10 +151,12 @@ export async function getValidationOverview(organizationId: string): Promise<Val
     const signaturesRequired = totalSignaturesRequired(doc.kind, {
       beSubtype: doc.beSubtype,
       bsSubtype: doc.bsSubtype,
+      btSubtype: doc.btSubtype,
     });
     const next = nextSignSlot(doc.kind, signaturesDone, {
       bsSubtype: doc.bsSubtype,
       beSubtype: doc.beSubtype,
+      btSubtype: doc.btSubtype,
       btTransitPhase: doc.btTransitPhase,
     });
     return {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { AppIcon } from "@/components/icons/AppIcon";
+import { clientFetch } from "@/lib/stock/api";
 
 export function ProfileTwoFactor() {
   const [enabled, setEnabled] = useState(false);
@@ -12,7 +13,7 @@ export function ProfileTwoFactor() {
   const [message, setMessage] = useState("");
 
   const loadStatus = useCallback(async () => {
-    const res = await fetch("/api/auth/2fa/setup");
+    const res = await clientFetch("/api/auth/2fa/setup");
     if (res.ok) {
       const data = (await res.json()) as { enabled: boolean };
       setEnabled(data.enabled);
@@ -24,7 +25,7 @@ export function ProfileTwoFactor() {
   }, [loadStatus]);
 
   async function beginSetup() {
-    const res = await fetch("/api/auth/2fa/setup", {
+    const res = await clientFetch("/api/auth/2fa/setup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "begin" }),
@@ -38,7 +39,7 @@ export function ProfileTwoFactor() {
   }
 
   async function confirmSetup() {
-    const res = await fetch("/api/auth/2fa/setup", {
+    const res = await clientFetch("/api/auth/2fa/setup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "confirm", code }),

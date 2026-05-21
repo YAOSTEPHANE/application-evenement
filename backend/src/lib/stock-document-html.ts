@@ -5,8 +5,8 @@ import {
   DOC_KIND_LABELS,
   DOC_STATUS_LABELS,
 } from "@/lib/cdc-labels";
-import { archiveRetentionUntil, hashDocumentContent } from "@/lib/cdc-stock-document-rules";
 import type { getStockDocument } from "@/lib/stock-document-db";
+import { archiveRetentionUntil, hashDocumentContent } from "@/lib/totp-auth";
 
 type Doc = Awaited<ReturnType<typeof getStockDocument>>;
 

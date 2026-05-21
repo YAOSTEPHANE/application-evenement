@@ -27,6 +27,7 @@ import {
   STAFF_PROFILE_CATEGORIES,
 } from "@/lib/cdc-hr-personnel";
 import type { HrStats } from "@/lib/hr-db";
+import { clientFetch, fetchAuthMe } from "@/lib/stock/api";
 
 type TabId = "personnel" | "flotte" | "affectations" | "journaliers";
 type StaffModalMode = "new" | "link";
@@ -145,14 +146,14 @@ export function HrModulePage({ events }: HrModulePageProps) {
     setLoading(true);
     try {
       const q = filterEventId ? `?eventId=${filterEventId}` : "";
-      const [statsRes, staffRes, vehRes, assignRes, dailyRes, usersRes, meRes] = await Promise.all([
-        fetch("/api/cdc/hr/stats"),
-        fetch("/api/hr/staff"),
-        fetch("/api/hr/vehicles"),
-        fetch(`/api/hr/assignments${q}`),
-        fetch("/api/hr/daily-workers"),
-        fetch("/api/users"),
-        fetch("/api/auth/me"),
+      const [statsRes, staffRes, vehRes, assignRes, dailyRes, usersRes, me] = await Promise.all([
+        clientFetch("/api/cdc/hr/stats"),
+        clientFetch("/api/hr/staff"),
+        clientFetch("/api/hr/vehicles"),
+        clientFetch(`/api/hr/assignments${q}`),
+        clientFetch("/api/hr/daily-workers"),
+        clientFetch("/api/users"),
+        fetchAuthMe(),
       ]);
       if (statsRes.ok) setStats((await statsRes.json()) as HrStats);
       if (staffRes.ok) setStaff((await staffRes.json()) as StaffRow[]);
@@ -163,10 +164,7 @@ export function HrModulePage({ events }: HrModulePageProps) {
         const raw = (await usersRes.json()) as Array<{ id: string; fullName: string; email: string }>;
         setUsers(raw.map((u) => ({ id: u.id, fullName: u.fullName, email: u.email })));
       }
-      if (meRes.ok) {
-        const me = (await meRes.json()) as { role?: Role };
-        setIsAdmin(me.role === Role.ADMIN);
-      }
+      setIsAdmin(me?.role === Role.ADMIN);
     } finally {
       setLoading(false);
     }
@@ -275,7 +273,7 @@ export function HrModulePage({ events }: HrModulePageProps) {
               role: staffAppRole,
               ...staffCategoryPayload(),
             };
-      const res = await fetch("/api/hr/staff", {
+      const res = await clientFetch("/api/hr/staff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -300,7 +298,7 @@ export function HrModulePage({ events }: HrModulePageProps) {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/hr/vehicles", {
+      const res = await clientFetch("/api/hr/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -326,7 +324,7 @@ export function HrModulePage({ events }: HrModulePageProps) {
   }
 
   async function patchVehicleStatus(id: string, status: VehicleStatus) {
-    await fetch(`/api/hr/vehicles/${id}`, {
+    await clientFetch(`/api/hr/vehicles/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
@@ -342,7 +340,7 @@ export function HrModulePage({ events }: HrModulePageProps) {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/hr/assignments", {
+      const res = await clientFetch("/api/hr/assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -371,7 +369,7 @@ export function HrModulePage({ events }: HrModulePageProps) {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/hr/daily-workers", {
+      const res = await clientFetch("/api/hr/daily-workers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -796,12 +794,20 @@ export function HrModulePage({ events }: HrModulePageProps) {
             <button type="button" className="btn btn-outline" onClick={() => setModalStaff(false)}>
               Annuler
             </button>
-            <button type="button" className="btn btn-gold" disabled={saving} onClick={() => void saveStaff()}>
+            <button type="submit" className="btn btn-gold" disabled={saving} form="hr-staff-modal-form">
               {staffModalMode === "new" ? "Créer" : "Enregistrer"}
             </button>
           </FormActions>
         }
       >
+        <form
+          id="hr-staff-modal-form"
+          className="hr-staff-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveStaff();
+          }}
+        >
         <FormGrid>
           <div className="full hr-staff-mode-tabs">
             <button
@@ -936,6 +942,7 @@ export function HrModulePage({ events }: HrModulePageProps) {
           />
           {formError ? <p className="form-error full" role="alert">{formError}</p> : null}
         </FormGrid>
+        </form>
       </ModalForm>
 
       <ModalForm

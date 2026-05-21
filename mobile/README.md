@@ -9,6 +9,8 @@ Sans réseau, l’app conserve en local (AsyncStorage) :
 - **Création de bon** BS-EVT (tags + commande) → file `create_document`
 - **Scan** douchette ou sur bon → file `scan` / `portique`
 - **Signature** → file `sign`
+- **Chargement / retour commande** → files `event_loading`, `event_be_ret` (BS-EVT / BE-RET auto)
+- **Incident terrain** → file `incident`
 
 À la **reconnexion**, la file est rejouée **dans l’ordre** ; les actions en échec restent en attente (aucune suppression silencieuse). Les bons créés hors ligne reçoivent un identifiant temporaire (`temp_…`) remplacé par l’ID serveur après sync.
 

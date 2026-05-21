@@ -17,7 +17,8 @@ export type LegacyPageId =
   | "mouvements"
   | "rapports"
   | "scan"
-  | "utilisateurs";
+  | "utilisateurs"
+  | "parametres";
 
 export type PageId = CdcModulePageId | LegacyPageId | "profil";
 
@@ -75,7 +76,10 @@ export function Sidebar({
   );
 
   const isSecondaryActive = useMemo(
-    () => mobileMorePages.some((e) => e.page === activePage) || activePage === "profil",
+    () =>
+      mobileMorePages.some((e) => e.page === activePage) ||
+      activePage === "profil" ||
+      activePage === "parametres",
     [activePage, mobileMorePages],
   );
 
@@ -159,6 +163,19 @@ export function Sidebar({
           EVENT · RFID
         </div>
         {renderNavGroup(MODULE_NAV)}
+
+        <div
+          className={itemClass("parametres")}
+          onClick={() => goTo("parametres")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") goTo("parametres");
+          }}
+        >
+          <NavIcon name="settings" />
+          <span className="nav-label">Paramètres</span>
+        </div>
 
         <Link
           href="/deconnexion"
@@ -250,6 +267,10 @@ export function Sidebar({
             <button type="button" className={mobileItemClass("profil")} onClick={() => goTo("profil")}>
               <NavIcon name="profile" />
               <span>Mon profil</span>
+            </button>
+            <button type="button" className={mobileItemClass("parametres")} onClick={() => goTo("parametres")}>
+              <NavIcon name="settings" />
+              <span>Paramètres</span>
             </button>
             <Link href="/deconnexion" className="mobile-nav-item" prefetch={false} onClick={closeMobileMore}>
               <NavIcon name="logout" />

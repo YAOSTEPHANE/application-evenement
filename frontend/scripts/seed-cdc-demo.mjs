@@ -34,11 +34,11 @@ async function main() {
 
   await prisma.trackedAsset.upsert({
     where: { id: IDS.tagChaise1 },
-    update: { tagCode: "TAG-MOB-0001", status: TrackedAssetStatus.AVAILABLE },
+    update: { tagCode: "TAG-MOBC-0001", status: TrackedAssetStatus.AVAILABLE },
     create: {
       id: IDS.tagChaise1,
       organizationId: IDS.org,
-      tagCode: "TAG-MOB-0001",
+      tagCode: "TAG-MOBC-0001",
       itemId: IDS.itemChaise,
       rfidTagType: RfidTagType.ADHESIVE,
       status: TrackedAssetStatus.AVAILABLE,
@@ -122,7 +122,7 @@ async function main() {
     data: { orderStatus: OrderStatus.PENDING },
   });
 
-  console.log("CDC demo OK — tag TAG-MOB-0001, bon BS-EVT, véhicule, profil RH");
+  console.log("CDC demo OK — tag TAG-MOBC-0001, bon BS-EVT, véhicule, profil RH");
 }
 
 main()

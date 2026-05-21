@@ -8,6 +8,7 @@ export const CDC_BE_SUMMARY =
 export type BeDocumentProgressInput = {
   status: StockDocumentStatus;
   beSubtype: BeSubtype | null;
+  eventId?: string | null;
   toWarehouseId: string | null;
   shipperUserId: string | null;
   receiverUserId: string | null;
@@ -34,6 +35,9 @@ export function assertBeMandatoryFieldsForSignature(
   }
   if (doc.beSubtype === BeSubtype.BE_TRF && !doc.sourceReference?.trim()) {
     return { ok: false, message: "Référence BT source obligatoire (BE-TRF)." };
+  }
+  if (doc.beSubtype === BeSubtype.BE_RET && !doc.eventId) {
+    return { ok: false, message: "Commande événement liée obligatoire pour un BE-RET." };
   }
   return { ok: true };
 }

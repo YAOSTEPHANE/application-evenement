@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { btTransitPhaseLabel } from "@/lib/cdc-bt-document";
 import { archiveRetentionLabel } from "@/lib/cdc-stock-document-rules";
+import { CdcDirectingPrinciple } from "@/components/CdcDirectingPrinciple";
 import { CdcDocumentWizard } from "@/components/CdcDocumentWizard";
 import { CdcPageHeader } from "@/components/CdcPageHeader";
 import { AppIcon } from "@/components/icons/AppIcon";
@@ -25,6 +26,7 @@ import {
 import { documentLinesRfidComplete } from "@/lib/cdc-order-workflow";
 import { useToastContext } from "@/lib/toast/ToastProvider";
 import { documentSignPlan, totalSignaturesRequired } from "@/lib/cdc-validation-matrix";
+import { consumeCdcBonsFlow } from "@/lib/cdc-bons-navigation";
 import { listWizardPresets } from "@/lib/cdc-wizard-config";
 import type { StockDocumentsKpis } from "@/lib/stock-document-kpis";
 
@@ -195,6 +197,30 @@ export function MovementsModulePage({ warehouses, events, items }: MovementsModu
       setDriverId(d.driverUserId ?? "");
     }
   }, []);
+
+  useEffect(() => {
+    const legacyId = sessionStorage.getItem("stockevent_open_stock_doc");
+    if (legacyId) {
+      sessionStorage.removeItem("stockevent_open_stock_doc");
+      void openDetail(legacyId);
+      return;
+    }
+    const flow = consumeCdcBonsFlow();
+    if (!flow) return;
+    if (flow.openDocumentId) {
+      void openDetail(flow.openDocumentId);
+      return;
+    }
+    if (flow.openWizard) {
+      setDocPreset({
+        kind: flow.kind ?? "BS",
+        bsSubtype: flow.bsSubtype as keyof typeof BS_SUBTYPE_LABELS | undefined,
+        beSubtype: flow.beSubtype as keyof typeof BE_SUBTYPE_LABELS | undefined,
+        eventId: flow.eventId,
+      });
+      setWizardOpen(true);
+    }
+  }, [openDetail]);
 
   const loadUsers = useCallback(async () => {
     const res = await fetch("/api/users");
@@ -501,6 +527,8 @@ export function MovementsModulePage({ warehouses, events, items }: MovementsModu
           </>
         }
       />
+
+      <CdcDirectingPrinciple variant="compact" className="mb16" />
 
       {kpis ? (
         <div className="movements-kpi-row">

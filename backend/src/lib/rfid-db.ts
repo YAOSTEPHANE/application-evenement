@@ -142,7 +142,6 @@ export async function getTrackedAssetDetail(organizationId: string, id: string) 
           },
         },
       },
-      orderBy: { createdAt: "desc" },
       take: 40,
     }),
     prisma.responsibilityLog.findMany({

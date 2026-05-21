@@ -19,6 +19,7 @@ import { RfidIdentificationPage } from "@/components/RfidIdentificationPage";
 import { HrModulePage } from "@/components/HrModulePage";
 import { TraceabilityModulePage } from "@/components/TraceabilityModulePage";
 import { ValidationModulePage } from "@/components/ValidationModulePage";
+import { stashCdcBonsFlow } from "@/lib/cdc-bons-navigation";
 import type { Article, Evenement } from "@/lib/stock/types";
 
 export type CdcPageId = "bons" | "rfid" | "commandes" | "rh" | "traceabilite" | "validation";
@@ -166,7 +167,16 @@ export function CdcModulePages({
       <div id="page-commandes" className={pageClass(activePage, "commandes")}>
         <OrdersModulePage
           onRefreshEvents={onRefreshEvents}
-          onNavigateToBons={onNavigate ? () => onNavigate("bons") : undefined}
+          onNavigateToBons={
+            onNavigate
+              ? (documentId) => {
+                  if (documentId) {
+                    stashCdcBonsFlow({ openDocumentId: documentId });
+                  }
+                  onNavigate("bons");
+                }
+              : undefined
+          }
         />
       </div>
 
@@ -177,7 +187,18 @@ export function CdcModulePages({
       {activePage === "traceabilite" ? <TraceabilityModulePage /> : null}
 
       <div id="page-validation" className={pageClass(activePage, "validation")}>
-        {activePage === "validation" ? <ValidationModulePage /> : null}
+        {activePage === "validation" ? (
+          <ValidationModulePage
+            onNavigateToBons={
+              onNavigate
+                ? (documentId) => {
+                    stashCdcBonsFlow({ openDocumentId: documentId });
+                    onNavigate("bons");
+                  }
+                : undefined
+            }
+          />
+        ) : null}
       </div>
     </>
   );

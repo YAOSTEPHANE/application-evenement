@@ -5,7 +5,14 @@ import { replaceOfflineDraftId, type CachedDocument } from "@/lib/offline-cache"
 
 const STORAGE_KEY = "cdc_offline_queue_v1";
 
-export type OfflineActionType = "create_document" | "scan" | "sign" | "portique";
+export type OfflineActionType =
+  | "create_document"
+  | "scan"
+  | "sign"
+  | "portique"
+  | "incident"
+  | "event_loading"
+  | "event_be_ret";
 
 export type OfflineAction = {
   id: string;
@@ -191,6 +198,40 @@ async function applySign(
   return true;
 }
 
+async function applyEventLifecycle(action: OfflineAction): Promise<boolean> {
+  const eventId = action.payload.eventId;
+  if (typeof eventId !== "string" || !eventId) {
+    await markActionFailed(action.id, "Événement manquant");
+    return false;
+  }
+  const path =
+    action.type === "event_loading"
+      ? `/api/events/${eventId}/loading`
+      : `/api/events/${eventId}/be-ret`;
+  const res = await apiFetch(path, { method: "POST" });
+  const data = (await res.json().catch(() => ({}))) as { message?: string; documentNumber?: string };
+  if (!res.ok) {
+    await markActionFailed(action.id, data.message ?? `HTTP ${res.status}`);
+    return false;
+  }
+  await clearOfflineAction(action.id);
+  return true;
+}
+
+async function applyIncident(action: OfflineAction): Promise<boolean> {
+  const res = await apiFetch("/api/terrain/incidents", {
+    method: "POST",
+    body: JSON.stringify(action.payload),
+  });
+  const data = (await res.json().catch(() => ({}))) as { message?: string };
+  if (!res.ok) {
+    await markActionFailed(action.id, data.message ?? `HTTP ${res.status}`);
+    return false;
+  }
+  await clearOfflineAction(action.id);
+  return true;
+}
+
 async function applyPortique(action: OfflineAction): Promise<boolean> {
   const res = await apiFetch("/api/portique/scan", {
     method: "POST",
@@ -223,6 +264,10 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
         ok = await applySign(action, idMap);
       } else if (action.type === "portique") {
         ok = await applyPortique(action);
+      } else if (action.type === "incident") {
+        ok = await applyIncident(action);
+      } else if (action.type === "event_loading" || action.type === "event_be_ret") {
+        ok = await applyEventLifecycle(action);
       } else {
         await markActionFailed(action.id, "Type d'action inconnu");
       }

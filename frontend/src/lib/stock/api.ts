@@ -136,7 +136,7 @@ export function getApiOriginForDisplay(): string {
 }
 
 /** URL absolue pour fetch : évite les chemins relatifs mal résolus (ex. /connexion/api/... → 404). */
-function resolveApiUrl(path: string): string {
+export function resolveApiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const base = getResolvedApiBaseUrl();
   if (!base) {
@@ -146,6 +146,11 @@ function resolveApiUrl(path: string): string {
     return normalized;
   }
   return `${base.replace(/\/+$/, "")}${normalized}`;
+}
+
+/** Fetch client avec cookie de session (composants hors `apiFetch`). */
+export function clientFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(resolveApiUrl(path), { ...init, credentials: "include" });
 }
 
 type BackendUserRole =

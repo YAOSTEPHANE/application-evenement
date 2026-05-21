@@ -67,7 +67,8 @@ export async function validateOrderStatusChange(
     if (!event) {
       return { ok: false, message: "Commande introuvable." };
     }
-    if (!getTrioValidationState(event).complete) {
+    const trio = getTrioValidationState(event);
+    if (!trio.complete) {
       return {
         ok: false,
         message:

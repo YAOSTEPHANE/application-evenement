@@ -28,7 +28,14 @@ export function ModalUser({ isOpen, mode, onClose, onSave }: ModalUserProps) {
         />
 
         <div className="modal-body">
-          <div className="form-grid form-premium">
+          <form
+            id="modal-user-form"
+            className="form-grid form-premium"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSave?.();
+            }}
+          >
             <input type="hidden" id="usr-id" />
             <div className="fg full">
               <label htmlFor="usr-username">Nom d&apos;utilisateur *</label>
@@ -102,14 +109,14 @@ export function ModalUser({ isOpen, mode, onClose, onSave }: ModalUserProps) {
                 />
               </div>
             )}
-          </div>
+          </form>
         </div>
 
         <div className="modal-ft">
           <button className="btn btn-outline" type="button" onClick={onClose}>
             Annuler
           </button>
-          <button className="btn btn-gold" type="button" onClick={onSave}>
+          <button className="btn btn-gold" type="submit" form="modal-user-form">
             {saveLabel}
           </button>
         </div>

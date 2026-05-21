@@ -184,6 +184,12 @@ export function ModalStockMovement({
         />
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
+          {subjectToPrinciple && category !== "Ajustement" && category !== "Perte/Casse" ? (
+            <p className="form-hint full" style={{ marginBottom: 12 }}>
+              Les sorties, entrées et retours passent par un <strong>bon BE / BS / BT signé</strong> (menu
+              Mouvements de matériel). Cochez ci-dessous uniquement pour une correction d&apos;écart.
+            </p>
+          ) : null}
           {subjectToPrinciple ? (
             <div className="fg full">
               <label className="chk">

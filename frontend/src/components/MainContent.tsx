@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalyticsRapports } from "@/components/AnalyticsRapports";
 import { ArticlesCatalogPage } from "@/components/ArticlesCatalogPage";
 import { CategoriesAdminPage } from "@/components/CategoriesAdminPage";
+import { AlertsModulePage } from "@/components/AlertsModulePage";
+import { SettingsModulePage } from "@/components/SettingsModulePage";
 import { DashboardModulePage } from "@/components/DashboardModulePage";
 import { CdcModulePages, type CdcPageId } from "@/components/CdcModulePages";
 import { isCdcModulePage } from "@/lib/cdc-modules";
@@ -41,7 +43,11 @@ type MainContentProps = {
   onOpenReceptionModal?: () => void;
   onOpenSortieModal?: () => void;
   onOpenRetourModal?: () => void;
-  /** Alias unifié (HomeClient) — utilisé si les modales séparées ne sont pas fournies. */
+  /** Flux CDC (assistant bon) — prioritaire sur la modale legacy. */
+  onOpenCdcSortie?: () => void;
+  onOpenCdcReception?: () => void;
+  onOpenCdcRetour?: () => void;
+  /** Alias unifié (HomeClient) — correction d’écart / legacy uniquement. */
   onOpenMovementModal?: (preset?: MovementUiType) => void;
   canManageWarehouses?: boolean;
   warehousesReloadToken?: number;
@@ -73,6 +79,8 @@ type MainContentProps = {
   onScanRetour: (payload: { ref: string; qty: number; eventId: string }) => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  themeMode?: "light" | "dark";
+  onToggleTheme?: () => void;
   onImportCsv: (file: File) => void;
   onRefreshAlerts: () => void;
   onOrderArticle: (articleId: string) => void;
@@ -180,6 +188,9 @@ export function MainContent({
   onOpenReceptionModal,
   onOpenSortieModal,
   onOpenRetourModal,
+  onOpenCdcSortie,
+  onOpenCdcReception,
+  onOpenCdcRetour,
   onOpenMovementModal,
   onToggleUserActive,
   onOpenUserModal,
@@ -199,6 +210,8 @@ export function MainContent({
   onScanRetour,
   soundEnabled,
   onToggleSound,
+  themeMode = "light",
+  onToggleTheme,
   onImportCsv,
   onRefreshAlerts,
   onOrderArticle,
@@ -506,9 +519,11 @@ export function MainContent({
             onOpenArticleModal={onOpenArticleModal}
             onOpenEventModal={onOpenEventModal}
             onOpenAffectModal={onOpenAffectModal}
-            onOpenSortieModal={onOpenSortieModal ?? (() => onOpenMovementModal?.("Sortie"))}
-            onOpenReceptionModal={onOpenReceptionModal ?? (() => onOpenMovementModal?.("Entrée"))}
-            onOpenRetourModal={onOpenRetourModal ?? (() => onOpenMovementModal?.("Retour"))}
+            onOpenSortieModal={onOpenCdcSortie ?? onOpenSortieModal ?? (() => onOpenMovementModal?.("Sortie"))}
+            onOpenReceptionModal={
+              onOpenCdcReception ?? onOpenReceptionModal ?? (() => onOpenMovementModal?.("Entrée"))
+            }
+            onOpenRetourModal={onOpenCdcRetour ?? onOpenRetourModal ?? (() => onOpenMovementModal?.("Retour"))}
             onOrderArticle={onOrderArticle}
           />
         ) : null}
@@ -700,14 +715,22 @@ export function MainContent({
             <div className="ph-sub">Historique complet des entrées, sorties et retours</div>
           </div>
           <div className="ph-actions">
-            <button className="btn btn-outline" type="button" onClick={onOpenReceptionModal}>
-              + Réception stock
+            <button
+              className="btn btn-outline"
+              type="button"
+              onClick={onOpenCdcReception ?? onOpenReceptionModal}
+            >
+              + Bon d&apos;entrée (CDC)
             </button>
-            <button className="btn btn-outline" type="button" onClick={onOpenSortieModal}>
-              ↗ Enregistrer une sortie
+            <button
+              className="btn btn-outline"
+              type="button"
+              onClick={onOpenCdcSortie ?? onOpenSortieModal}
+            >
+              ↗ Bon de sortie (CDC)
             </button>
-            <button className="btn btn-gold" type="button" onClick={onOpenRetourModal}>
-              ↩ Enregistrer un retour
+            <button className="btn btn-gold" type="button" onClick={onOpenCdcRetour ?? onOpenRetourModal}>
+              ↩ Retour événement
             </button>
           </div>
         </div>
@@ -821,54 +844,13 @@ export function MainContent({
       </div>
 
       <div id="page-alertes" className={pageClass(activePage, "alertes")}>
-        <div className="ph">
-          <div className="ph-left">
-            <div className="ph-title">Gestion des Alertes</div>
-            <div className="ph-sub">{alerts.length} alerte(s) active(s)</div>
-          </div>
-          <div className="ph-actions">
-            <button className="btn btn-outline btn-sm" type="button" onClick={onRefreshAlerts}>
-              ↻ Actualiser
-            </button>
-          </div>
-        </div>
-        <div id="alertes-list">
-          {alerts.map((article) => (
-            <div
-              key={article.id}
-              className={`card card-pad mb12 alert-card ${dispo(article) === 0 ? "alert-card-danger" : "alert-card-warn"}`}
-            >
-              <div className="alert-card-layout">
-                <div className="alert-card-main">
-                  <div className="item-thumb item-thumb-lg">{article.emoji || "📦"}</div>
-                  <div>
-                    <div className={`alert-card-title ${dispo(article) === 0 ? "fc-danger" : "fc-warn"}`}>
-                      {dispo(article) === 0 ? "Rupture de stock" : "Stock critique"} — {article.nom}
-                    </div>
-                    <div className="fs12 fc-3 mt3">
-                      {dispo(article)} unité(s) disponible(s) · Seuil min: {article.seuilMin} · Réf: {article.ref || "N/A"} · Catégorie: {article.cat}
-                    </div>
-                    <div className="fs12 fc-3">Valeur unitaire: {fmtNum(article.valUnit)} F CFA · Qté totale: {article.qtyTotal}</div>
-                  </div>
-                </div>
-                <div className="alert-card-actions">
-                  <button className="btn btn-outline btn-sm" type="button" onClick={() => onEditArticle(article.id)}>
-                    Modifier seuil
-                  </button>
-                  <button className="btn btn-sm btn-gold" type="button" onClick={() => onOrderArticle(article.id)}>
-                    Commander
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        {alerts.length === 0 ? (
-          <div id="alertes-empty" className="empty-state">
-            <div className="empty-icon">✓</div>
-            <h3>Aucune alerte active</h3>
-            <p>Tous les stocks sont au-dessus du seuil minimum. Bravo !</p>
-          </div>
+        {activePage === "alertes" ? (
+          <AlertsModulePage
+            stockAlerts={alerts}
+            onRefreshStock={onRefreshAlerts}
+            onEditArticle={onEditArticle}
+            onOrderArticle={onOrderArticle}
+          />
         ) : null}
       </div>
 
@@ -1008,6 +990,18 @@ export function MainContent({
         </div>
       </div>
 
+      <div id="page-parametres" className={pageClass(activePage, "parametres")}>
+        {activePage === "parametres" ? (
+          <SettingsModulePage
+            themeMode={themeMode}
+            onToggleTheme={() => onToggleTheme?.()}
+            soundEnabled={soundEnabled}
+            onToggleSound={onToggleSound}
+            onNavigate={onNavigate}
+          />
+        ) : null}
+      </div>
+
       <div id="page-profil" className={pageClass(activePage, "profil")}>
         <div className="ph">
           <div className="ph-left">
@@ -1017,9 +1011,22 @@ export function MainContent({
         </div>
         <div className="card card-pad">
           {currentUserProfile ? (
-            <div
+            <form
               className="form-grid"
               key={`${currentUserProfile.id}-${currentUserProfile.prenom}-${currentUserProfile.nom}-${currentUserProfile.email}`}
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSaveProfile({
+                  prenom: (document.getElementById("profile-prenom") as HTMLInputElement | null)?.value ?? "",
+                  nom: (document.getElementById("profile-nom") as HTMLInputElement | null)?.value ?? "",
+                  email: (document.getElementById("profile-email") as HTMLInputElement | null)?.value ?? "",
+                  avatarUrl: profileAvatarPreview || null,
+                  currentPassword:
+                    (document.getElementById("profile-current-password") as HTMLInputElement | null)?.value ?? "",
+                  newPassword:
+                    (document.getElementById("profile-new-password") as HTMLInputElement | null)?.value ?? "",
+                });
+              }}
             >
               <div className="fg">
                 <label>Prénom *</label>
@@ -1110,26 +1117,11 @@ export function MainContent({
                 />
               </div>
               <div className="fg full">
-                <button
-                  className="btn btn-gold"
-                  type="button"
-                  onClick={() =>
-                    onSaveProfile({
-                      prenom: (document.getElementById("profile-prenom") as HTMLInputElement | null)?.value ?? "",
-                      nom: (document.getElementById("profile-nom") as HTMLInputElement | null)?.value ?? "",
-                      email: (document.getElementById("profile-email") as HTMLInputElement | null)?.value ?? "",
-                      avatarUrl: profileAvatarPreview || null,
-                      currentPassword:
-                        (document.getElementById("profile-current-password") as HTMLInputElement | null)?.value ?? "",
-                      newPassword:
-                        (document.getElementById("profile-new-password") as HTMLInputElement | null)?.value ?? "",
-                    })
-                  }
-                >
+                <button className="btn btn-gold" type="submit">
                   Enregistrer mon profil
                 </button>
               </div>
-            </div>
+            </form>
           ) : (
             <div className="empty-state">
               <p>Profil utilisateur introuvable.</p>

@@ -35,6 +35,7 @@ export type OrderWorkflowState = {
   canStartReturn: boolean;
   canSettle: boolean;
   blockers: string[];
+  /** Prochaine action métier recommandée (CDC interdépendance). */
   nextAction: { label: string; endpoint: string; method: "POST" } | null;
 };
 

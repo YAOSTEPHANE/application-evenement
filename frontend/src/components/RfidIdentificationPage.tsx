@@ -20,6 +20,7 @@ import {
   getRfidTagTypology,
   suggestRfidTagTypeFromMaterialHint,
 } from "@/lib/rfid-tag-typology";
+import { clientFetch } from "@/lib/stock/api";
 import type { Article } from "@/lib/stock/types";
 
 type WarehouseOption = { id: string; name: string; code: string };
@@ -182,14 +183,14 @@ export function RfidIdentificationPage({
   }, [q, warehouseId, categoryId, statusFilter, conditionFilter, tagTypeFilter]);
 
   const loadStats = useCallback(async () => {
-    const res = await fetch("/api/rfid-tags/stats");
+    const res = await clientFetch("/api/rfid-tags/stats");
     if (res.ok) setStats(await res.json());
   }, []);
 
   const loadAssets = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/rfid-tags?${queryString}`);
+      const res = await clientFetch(`/api/rfid-tags?${queryString}`);
       if (res.ok) setAssets(await res.json());
     } finally {
       setLoading(false);
@@ -203,7 +204,7 @@ export function RfidIdentificationPage({
       if (q.trim()) p.set("q", q.trim());
       if (categoryId) p.set("categoryId", categoryId);
       if (catalogTagTypeFilter) p.set("defaultRfidTagType", catalogTagTypeFilter);
-      const res = await fetch(`/api/rfid-tags/catalog?${p}`);
+      const res = await clientFetch(`/api/rfid-tags/catalog?${p}`);
       if (res.ok) setCatalog(await res.json());
     } finally {
       setLoading(false);
@@ -226,13 +227,13 @@ export function RfidIdentificationPage({
 
   async function openDetail(id: string) {
     setSelectedId(id);
-    const res = await fetch(`/api/rfid-tags/${id}`);
+    const res = await clientFetch(`/api/rfid-tags/${id}`);
     if (res.ok) setDetail(await res.json());
   }
 
   async function suggestTag() {
     const cat = categories.find((c) => c.id === categoryId);
-    const res = await fetch(
+    const res = await clientFetch(
       `/api/rfid-tags?suggest=1&categoryCode=${encodeURIComponent(cat?.code ?? "GEN")}`,
     );
     if (res.ok) {
@@ -246,7 +247,7 @@ export function RfidIdentificationPage({
       showToast("Tag et article obligatoires.");
       return;
     }
-    const res = await fetch("/api/rfid-tags", {
+    const res = await clientFetch("/api/rfid-tags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -270,7 +271,7 @@ export function RfidIdentificationPage({
 
   async function updateDetailCondition(condition: keyof typeof ITEM_CONDITION_LABELS) {
     if (!detail) return;
-    const res = await fetch(`/api/rfid-tags/${detail.id}`, {
+    const res = await clientFetch(`/api/rfid-tags/${detail.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ condition }),
@@ -290,7 +291,7 @@ export function RfidIdentificationPage({
 
   async function validateTagCode() {
     if (!detail) return;
-    const res = await fetch(`/api/rfid-tags/${detail.id}/validate`, { method: "POST" });
+    const res = await clientFetch(`/api/rfid-tags/${detail.id}/validate`, { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       showToast((data as { message?: string }).message ?? "Validation impossible");
@@ -307,7 +308,7 @@ export function RfidIdentificationPage({
       .map((t) => t.trim())
       .filter(Boolean);
     if (tagCodes.length === 0) return;
-    const res = await fetch("/api/rfid-tags/inventory-sample", {
+    const res = await clientFetch("/api/rfid-tags/inventory-sample", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -861,7 +862,7 @@ export function RfidIdentificationPage({
               className="rfid-scan-textarea"
               value={sampleTags}
               onChange={(e) => setSampleTags(e.target.value)}
-              placeholder="TAG-MOB-0001 TAG-CHR-0002 …"
+              placeholder="TAG-MOBC-0001 TAG-MOBC-0002 …"
             />
             <button type="button" className="btn btn-gold btn-icon" onClick={() => void runSample()}>
               <AppIcon name="scan" size={16} />

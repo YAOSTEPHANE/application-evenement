@@ -24,7 +24,7 @@ const optionalUrl = z.union([z.string().url().max(2048), z.literal("")]).optiona
 const optionalStr = z.string().max(500).optional().nullable();
 const optionalNum = z.number().nonnegative().optional().nullable();
 
-function refineStockLevels(
+export function refineStockLevels(
   data: {
     minThreshold: number;
     maxStockQty: number;
@@ -57,7 +57,7 @@ function refineStockLevels(
   }
 }
 
-const itemWriteBaseSchema = z.object({
+export const itemWriteBaseSchema = z.object({
   name: z.string().min(2).max(200),
   reference: z.string().min(2).max(80),
   categoryId: z.string().min(1),
@@ -107,7 +107,7 @@ const itemWriteBaseSchema = z.object({
 export const itemWriteSchema = itemWriteBaseSchema.superRefine(refineStockLevels);
 
 export const itemCreateSchema = itemWriteBaseSchema
-  .extend({
+  .safeExtend({
     totalQuantity: z.number().int().positive(),
   })
   .superRefine(refineStockLevels);

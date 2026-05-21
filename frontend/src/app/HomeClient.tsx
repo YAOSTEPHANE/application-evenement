@@ -9,6 +9,7 @@ import { ModalArticle } from "@/components/ModalArticle";
 import { ModalConfirm } from "@/components/ModalConfirm";
 import { ModalEvent } from "@/components/ModalEvent";
 import { ModalStockMovement } from "@/components/ModalStockMovement";
+import { stashCdcBonsFlow, type CdcBonsFlowIntent } from "@/lib/cdc-bons-navigation";
 import { ModalCategory } from "@/components/ModalCategory";
 import { ModalWarehouse } from "@/components/ModalWarehouse";
 import { ModalWarehouseZones } from "@/components/ModalWarehouseZones";
@@ -619,6 +620,20 @@ function HomeApp() {
     setAffectModalOpen(true);
   }
 
+  function openCdcBonsFlow(intent: CdcBonsFlowIntent) {
+    stashCdcBonsFlow(intent);
+    navigateToPage("bons");
+  }
+
+  function openCdcBonsWizard(preset: Omit<CdcBonsFlowIntent, "openWizard">) {
+    openCdcBonsFlow({ ...preset, openWizard: true });
+    showToast(
+      "Utilisez l’assistant bon (BE / BS / BT) : tout mouvement physique doit être documenté et signé.",
+      "default",
+    );
+  }
+
+  /** Legacy — correction d’écart uniquement ; les flux métier passent par les bons CDC. */
   function openMovementModal(preset: MovementUiType = "Entrée") {
     setMovementPreset(preset);
     setMovementModalOpen(true);
@@ -1062,6 +1077,7 @@ function HomeApp() {
         userAvatarUrl={currentUser.avatarUrl}
         onOpenAlerts={() => navigateToPage("alertes")}
         onOpenProfile={() => navigateToPage("profil")}
+        onOpenSettings={() => navigateToPage("parametres")}
         onSearchChange={runGlobalSearch}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
@@ -1089,6 +1105,12 @@ function HomeApp() {
         }}
         onOpenAffectModal={openAffectModal}
         onOpenMovementModal={openMovementModal}
+        onOpenCdcSortie={() => openCdcBonsWizard({ kind: "BS", bsSubtype: "BS_EVT" })}
+        onOpenCdcReception={() => openCdcBonsWizard({ kind: "BE", beSubtype: "BE_FRN" })}
+        onOpenCdcRetour={() => {
+          navigateToPage("commandes");
+          showToast("Sélectionnez la commande, puis « Démarrer retour » pour générer le BE-RET.", "default");
+        }}
         onToggleUserActive={(userId, active) => {
           void (async () => {
             try {
@@ -1288,6 +1310,8 @@ function HomeApp() {
         }}
         soundEnabled={soundEnabled}
         onToggleSound={toggleSound}
+        themeMode={themeMode}
+        onToggleTheme={toggleTheme}
       />
       <ModalWarehouse
         isOpen={warehouseModalOpen}

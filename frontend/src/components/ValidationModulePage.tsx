@@ -35,8 +35,14 @@ import type {
   ValidationSecurityRow,
   ValidationStats,
 } from "@/lib/validation-db";
+import { clientFetch } from "@/lib/stock/api";
+import { useToastContext } from "@/lib/toast/ToastProvider";
 
 type TabId = "droits" | "signatures" | "file" | "archives" | "securite";
+
+type ValidationModulePageProps = {
+  onNavigateToBons?: (documentId: string) => void;
+};
 
 function permCell(allowed: boolean): string {
   return allowed ? "val-perm--yes" : "val-perm--no";
@@ -48,8 +54,10 @@ function statusClass(status: PendingValidationDoc["status"]): string {
   return "val-queue-card--sign";
 }
 
-export function ValidationModulePage() {
+export function ValidationModulePage({ onNavigateToBons }: ValidationModulePageProps) {
+  const { showToast } = useToastContext();
   const [tab, setTab] = useState<TabId>("file");
+  const [signingId, setSigningId] = useState<string | null>(null);
   const [stats, setStats] = useState<ValidationStats | null>(null);
   const [pending, setPending] = useState<PendingValidationDoc[]>([]);
   const [archives, setArchives] = useState<ValidationArchiveRow[]>([]);
@@ -59,7 +67,7 @@ export function ValidationModulePage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/cdc/validation/overview");
+      const res = await clientFetch("/api/cdc/validation/overview");
       if (!res.ok) return;
       const data = (await res.json()) as ValidationOverview;
       setStats(data.stats);
@@ -74,6 +82,22 @@ export function ValidationModulePage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function signDocument(docId: string) {
+    setSigningId(docId);
+    try {
+      const res = await clientFetch(`/api/stock-documents/${docId}/sign`, { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        showToast(data.message ?? "Signature refusée", "danger");
+        return;
+      }
+      showToast("Signature enregistrée.");
+      await load();
+    } finally {
+      setSigningId(null);
+    }
+  }
 
   const openCount =
     (stats?.pendingSignature ?? 0) + (stats?.scanning ?? 0) + (stats?.disputed ?? 0);
@@ -192,6 +216,34 @@ export function ValidationModulePage() {
                     </p>
                   ) : null}
                   <div className="val-queue-actions">
+                    {onNavigateToBons ? (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-gold"
+                        onClick={() => onNavigateToBons(doc.id)}
+                      >
+                        Ouvrir le bon
+                      </button>
+                    ) : null}
+                    {doc.status === "PENDING_SIGNATURE" || doc.status === "SCANNING" ? (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        disabled={signingId === doc.id}
+                        onClick={() => void signDocument(doc.id)}
+                      >
+                        {signingId === doc.id ? "…" : "Signer"}
+                      </button>
+                    ) : null}
+                    {onNavigateToBons && doc.status === "SCANNING" ? (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() => onNavigateToBons(doc.id)}
+                      >
+                        Scanner RFID
+                      </button>
+                    ) : null}
                     <a
                       className="btn btn-xs btn-outline btn-icon"
                       href={`/api/stock-documents/${doc.id}/pdf`}

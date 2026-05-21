@@ -9,6 +9,13 @@ import type { MovementCreateInput } from "@/lib/movement-helpers";
 
 export const CDC_DIRECTING_PRINCIPLE_SECTION = "7.1";
 
+export const CDC_DIRECTING_PRINCIPLE_TITLE = "Principe directeur";
+
+export const CDC_FUNDAMENTAL_RULE_LABEL = "Règle fondamentale";
+
+export const CDC_RFID_TRACEABILITY_ADDENDUM =
+  "Chaque article concerné doit être identifié par RFID ; le bon signé fait foi du mouvement physique.";
+
 export const CDC_7_1_RULE_BODY =
   "Tout mouvement physique de matériel doit être précédé ou accompagné de l'émission d'un document numérique (Bon d'Entrée, Bon de Sortie ou Bon de Transfert) généré et signé via l'application.";
 
@@ -21,6 +28,30 @@ export const CDC_ALLOWED_MOVEMENT_DOCUMENT_KINDS: readonly StockDocumentKind[] =
 ];
 
 export const CDC_UNDOCUMENTED_MOVEMENT_CODE = "UNDOCUMENTED_PHYSICAL_MOVEMENT";
+
+export type DirectingPrinciplePublic = {
+  section: string;
+  title: string;
+  fundamentalRuleLabel: string;
+  body: string;
+  footnote: string;
+  rfidAddendum: string;
+  allowedDocumentKinds: StockDocumentKind[];
+  enforced: boolean;
+};
+
+export function getDirectingPrinciplePublic(): DirectingPrinciplePublic {
+  return {
+    section: CDC_DIRECTING_PRINCIPLE_SECTION,
+    title: CDC_DIRECTING_PRINCIPLE_TITLE,
+    fundamentalRuleLabel: CDC_FUNDAMENTAL_RULE_LABEL,
+    body: CDC_7_1_RULE_BODY,
+    footnote: CDC_7_1_RULE_FOOTNOTE,
+    rfidAddendum: CDC_RFID_TRACEABILITY_ADDENDUM,
+    allowedDocumentKinds: [...CDC_ALLOWED_MOVEMENT_DOCUMENT_KINDS],
+    enforced: isDirectingPrincipleEnforced(),
+  };
+}
 
 export function isDirectingPrincipleEnforced(): boolean {
   const raw = process.env.CDC_ENFORCE_DIRECTING_PRINCIPLE?.trim().toLowerCase();

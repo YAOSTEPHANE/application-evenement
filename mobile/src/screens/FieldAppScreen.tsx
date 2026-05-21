@@ -343,23 +343,55 @@ export function FieldAppScreen() {
     void refresh();
   }
 
+  async function runEventLifecycle(
+    eventId: string,
+    kind: "event_loading" | "event_be_ret",
+    okLabel: string,
+  ) {
+    if (!online) {
+      await enqueueOfflineAction({ type: kind, payload: { eventId } });
+      setMessage(`${okLabel} — en file hors ligne`);
+      return;
+    }
+    const path = kind === "event_loading" ? "loading" : "be-ret";
+    const res = await apiFetch(`/api/events/${eventId}/${path}`, { method: "POST" });
+    const data = (await res.json().catch(() => ({}))) as {
+      message?: string;
+      documentNumber?: string;
+    };
+    if (!res.ok) {
+      setMessage(data.message ?? "Action impossible");
+      return;
+    }
+    setMessage(
+      data.documentNumber
+        ? `${okLabel} — ${data.documentNumber}`
+        : okLabel,
+    );
+    void refresh();
+  }
+
   async function submitIncident() {
     if (incidentDesc.trim().length < 5) {
       setMessage("Décrivez l'incident (5 caractères min.).");
       return;
     }
+    const payload = {
+      incidentType,
+      description: incidentDesc.trim(),
+      eventId: incidentEventId || undefined,
+      tagCode: incidentTag.trim() || undefined,
+    };
     if (!online) {
-      setMessage("Signalement incident nécessite une connexion.");
+      await enqueueOfflineAction({ type: "incident", payload });
+      setIncidentDesc("");
+      setIncidentTag("");
+      setMessage("Incident en file — envoi à la reconnexion.");
       return;
     }
     const res = await apiFetch("/api/terrain/incidents", {
       method: "POST",
-      body: JSON.stringify({
-        incidentType,
-        description: incidentDesc.trim(),
-        eventId: incidentEventId || undefined,
-        tagCode: incidentTag.trim() || undefined,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = (await res.json().catch(() => ({}))) as { message?: string };
     if (res.ok) {
@@ -543,16 +575,40 @@ export function FieldAppScreen() {
                   a.event.orderStatus}
                 {a.isTeamLeader ? " · Chef d'équipe" : ""}
               </Text>
-              <Pressable
-                style={styles.missionBtn}
-                onPress={() => {
-                  setIncidentEventId(a.event.id);
-                  setTab("incident");
-                  setMessage("Complétez le signalement ci-dessous.");
-                }}
-              >
-                <Text style={styles.missionBtnText}>Réception / incident</Text>
-              </Pressable>
+              <View style={styles.missionActions}>
+                <Pressable
+                  style={styles.missionBtn}
+                  onPress={() => void runEventLifecycle(a.event.id, "event_loading", "BS-EVT généré")}
+                >
+                  <Text style={styles.missionBtnText}>Chargement (BS-EVT)</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.missionBtn}
+                  onPress={() => void runEventLifecycle(a.event.id, "event_be_ret", "BE-RET généré")}
+                >
+                  <Text style={styles.missionBtnText}>Retour (BE-RET)</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.missionBtn, styles.missionBtnGhost]}
+                  onPress={() => {
+                    setCreateEventId(a.event.id);
+                    setTab("bon");
+                    setMessage("Créez ou scannez le BS-EVT sur l’onglet Bon.");
+                  }}
+                >
+                  <Text style={styles.missionBtnText}>Bon / scan</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.missionBtn, styles.missionBtnGhost]}
+                  onPress={() => {
+                    setIncidentEventId(a.event.id);
+                    setTab("incident");
+                    setMessage("Complétez le signalement ci-dessous.");
+                  }}
+                >
+                  <Text style={styles.missionBtnText}>Incident</Text>
+                </Pressable>
+              </View>
             </View>
           ))}
           {leaderEvents
@@ -849,6 +905,8 @@ const styles = StyleSheet.create({
   missionMeta: { fontSize: 12, color: colors.text3, marginTop: 4 },
   missionDates: { fontSize: 12, color: colors.text2, marginTop: 8 },
   badge: { fontSize: 10, fontWeight: "700", color: colors.info, marginTop: 8, textTransform: "uppercase" },
+  missionActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  missionBtnGhost: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border },
   missionBtn: {
     marginTop: 12,
     backgroundColor: colors.gold,

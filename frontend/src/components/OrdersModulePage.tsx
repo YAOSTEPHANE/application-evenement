@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FormGrid, FormInput, FormSelect, FormTextarea, ModalForm } from "@/components/forms/FormPrimitives";
 import { AppIcon } from "@/components/icons/AppIcon";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_SHORT_LABELS } from "@/lib/cdc-labels";
+import { stashCdcBonsFlow } from "@/lib/cdc-bons-navigation";
 import type { OrderWorkflowState } from "@/lib/cdc-order-workflow";
 import {
   TRIO_PILLAR_LABELS,
@@ -84,7 +85,7 @@ type OrderDetail = {
 
 type OrdersModulePageProps = {
   onRefreshEvents?: () => void;
-  onNavigateToBons?: () => void;
+  onNavigateToBons?: (documentId?: string) => void;
 };
 
 function statusCardClass(status: OrderStatus): string {
@@ -398,6 +399,29 @@ export function OrdersModulePage({ onRefreshEvents, onNavigateToBons }: OrdersMo
     if (selectedId === eventId) await openDetail(eventId);
     await loadEvents();
     onRefreshEvents?.();
+  }
+
+  function navigateToStockDocument(documentId: string) {
+    stashCdcBonsFlow({ openDocumentId: documentId });
+    onNavigateToBons?.(documentId);
+  }
+
+  async function handleNextAction() {
+    if (!detail?.workflow.nextAction) return;
+    const { endpoint, method } = detail.workflow.nextAction;
+    if (method === "POST" && endpoint.includes("/loading")) {
+      await startLoading(detail.event.id);
+      return;
+    }
+    if (method === "POST" && endpoint.includes("/return")) {
+      await startReturn(detail.event.id);
+      return;
+    }
+    const docMatch = /\/api\/stock-documents\/([^/]+)$/.exec(endpoint);
+    if (docMatch?.[1]) {
+      navigateToStockDocument(docMatch[1]);
+      showToast("Ouverture du bon dans Mouvements de matériel.");
+    }
   }
 
   async function startReturn(eventId: string) {
@@ -774,6 +798,15 @@ export function OrdersModulePage({ onRefreshEvents, onNavigateToBons }: OrdersMo
             </div>
 
             <div className="orders-drawer-ft">
+              {detail.workflow.nextAction ? (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-gold"
+                  onClick={() => void handleNextAction()}
+                >
+                  {detail.workflow.nextAction.label}
+                </button>
+              ) : null}
               <button type="button" className="btn btn-sm btn-outline btn-icon" onClick={() => exportPdf(detail.event.id)}>
                 <AppIcon name="fileExport" size={14} />
                 PDF
@@ -789,14 +822,22 @@ export function OrdersModulePage({ onRefreshEvents, onNavigateToBons }: OrdersMo
                 </button>
               ) : null}
               {detail.workflow.bsEvt && !detail.progress.bsSigned ? (
-                <span className="fs11 text-muted">
-                  BS {detail.workflow.bsEvt.documentNumber} — Mouvements de matériel
-                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => navigateToStockDocument(detail.workflow.bsEvt!.id)}
+                >
+                  BS {detail.workflow.bsEvt.documentNumber}
+                </button>
               ) : null}
               {detail.workflow.beRet && !detail.progress.beRetSigned ? (
-                <span className="fs11 text-muted">
-                  BE {detail.workflow.beRet.documentNumber} — Mouvements de matériel
-                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => navigateToStockDocument(detail.workflow.beRet!.id)}
+                >
+                  BE {detail.workflow.beRet.documentNumber}
+                </button>
               ) : null}
               {detail.workflow.canSettle ? (
                 <span className="badge badge-ok fs11">Prête à solder (auto)</span>
