@@ -1,6 +1,25 @@
 import { dispo, uid } from "./helpers";
 import { currentUserName, getArticle } from "./selectors";
-import type { ReturnCondition, StockState } from "./types";
+import {
+  emptyArticleFields,
+  type Movement,
+  type ReturnCondition,
+  type StockState,
+} from "./types";
+
+function makeMovement(
+  input: Pick<Movement, "id" | "type" | "articleId" | "qty" | "operateur" | "etat" | "note" | "date"> &
+    Partial<Pick<Movement, "evId" | "signedQty" | "reason" | "fromLabel" | "toLabel">>,
+): Movement {
+  return {
+    evId: input.evId ?? "",
+    signedQty: input.signedQty ?? input.qty,
+    reason: input.reason ?? input.type,
+    fromLabel: input.fromLabel ?? "",
+    toLabel: input.toLabel ?? "",
+    ...input,
+  };
+}
 
 function withHeadMovement(state: StockState, movement: StockState["mouvements"][number]): StockState {
   return { ...state, mouvements: [movement, ...state.mouvements] };
@@ -43,6 +62,7 @@ export function saveArticleAction(
   const nextArticles = [
     ...state.articles,
     {
+      ...emptyArticleFields(),
       id: uid(),
       nom,
       ref: payload.ref.trim(),
@@ -51,6 +71,7 @@ export function saveArticleAction(
       qtyAff: 0,
       valUnit: payload.valUnit,
       seuilMin: payload.seuilMin,
+      stockLevels: { min: payload.seuilMin, max: 0, safety: 0, optimal: 0, alert: 0, critical: 0 },
       emoji: payload.emoji || "📦",
       notes: payload.notes.trim(),
     },
@@ -130,7 +151,7 @@ export function saveAffectationAction(
 
   const nextState = withHeadMovement(
     { ...state, articles: nextArticles },
-    {
+    makeMovement({
       id: uid(),
       type: "Sortie",
       articleId: payload.artId,
@@ -140,7 +161,7 @@ export function saveAffectationAction(
       etat: "",
       note: "Affectation événement",
       date: new Date().toISOString(),
-    },
+    }),
   );
 
   return { nextState, message: `${payload.qty}× ${article.nom} affecté à l'événement` };
@@ -170,7 +191,7 @@ export function saveSortieAction(
 
   const nextState = withHeadMovement(
     { ...state, articles: nextArticles },
-    {
+    makeMovement({
       id: uid(),
       type: "Sortie",
       articleId: payload.artId,
@@ -180,7 +201,7 @@ export function saveSortieAction(
       etat: "",
       note: payload.note.trim(),
       date: new Date().toISOString(),
-    },
+    }),
   );
 
   return { nextState, message: `Sortie de ${payload.qty}× ${article.nom} enregistrée` };
@@ -225,7 +246,7 @@ export function saveRetourAction(
 
   const nextState = withHeadMovement(
     { ...state, articles: nextArticles },
-    {
+    makeMovement({
       id: uid(),
       type: "Retour",
       articleId: payload.artId,
@@ -235,7 +256,7 @@ export function saveRetourAction(
       etat: payload.etat,
       note: payload.note.trim(),
       date: new Date().toISOString(),
-    },
+    }),
   );
 
   return { nextState, message: `Retour de ${payload.qty}× ${article.nom} — ${payload.etat}` };

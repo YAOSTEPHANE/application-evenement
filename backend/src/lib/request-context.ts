@@ -28,11 +28,22 @@ export type RequestContext = {
   actorId: string;
   role: Role | null;
   authMethod: "jwt" | "legacy" | "none";
+  twoFactorVerified: boolean;
 };
+
+function parseBearerToken(authorization: string | null): string | null {
+  if (!authorization?.startsWith("Bearer ")) {
+    return null;
+  }
+  const token = authorization.slice(7).trim();
+  return token.length > 0 ? token : null;
+}
 
 export async function getRequestContext(): Promise<RequestContext> {
   const h = await headers();
-  const token = parseCookie(h.get("cookie"), SESSION_COOKIE_NAME);
+  const token =
+    parseCookie(h.get("cookie"), SESSION_COOKIE_NAME) ??
+    parseBearerToken(h.get("authorization"));
   if (token) {
     const session = await verifySessionToken(token);
     if (session) {
@@ -41,6 +52,7 @@ export async function getRequestContext(): Promise<RequestContext> {
         actorId: session.userId,
         role: session.role,
         authMethod: "jwt",
+        twoFactorVerified: session.twoFactorVerified,
       };
     }
   }
@@ -54,6 +66,7 @@ export async function getRequestContext(): Promise<RequestContext> {
       actorId: "",
       role: null,
       authMethod: "none",
+      twoFactorVerified: false,
     };
   }
 
@@ -67,5 +80,6 @@ export async function getRequestContext(): Promise<RequestContext> {
     actorId,
     role: actor?.role ?? null,
     authMethod: "legacy",
+    twoFactorVerified: true,
   };
 }

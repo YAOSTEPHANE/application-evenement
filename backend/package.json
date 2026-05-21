@@ -11,7 +11,8 @@
     "start": "next start -p 3001",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "seed": "npm run prisma:generate && node ../frontend/scripts/run-seed-once.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

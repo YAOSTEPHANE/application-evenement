@@ -116,6 +116,7 @@ function isPublicApiPath(pathname: string): boolean {
   if (pathname === "/api/auth/logout") return true;
   if (pathname === "/api/health") return true;
   if (pathname.startsWith("/api/setup/seed")) return true;
+  if (pathname === "/api/cdc/alerts/run") return true;
   return false;
 }
 

@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 
+import { AppIcon } from "@/components/icons/AppIcon";
+
 type TopbarProps = {
   userInitials?: string;
   userFullName?: string;
@@ -27,14 +29,14 @@ export function Topbar({
     <header id="topbar">
       <div className="logo">
         <div className="logo-mark" aria-hidden="true">
-          📦
+          <AppIcon name="package" size={18} />
         </div>
         Stock<span>Event</span> Pro
       </div>
 
       <div className="top-search-wrap">
         <span className="search-icon" aria-hidden="true">
-          ⌕
+          <AppIcon name="search" size={16} />
         </span>
         <input
           className="top-search"
@@ -53,16 +55,11 @@ export function Topbar({
           title={themeMode === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
           aria-label={themeMode === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
         >
-          <span aria-hidden="true">{themeMode === "dark" ? "☀" : "☾"}</span>
+          <AppIcon name={themeMode === "dark" ? "themeSun" : "themeMoon"} size={18} />
         </button>
 
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => onOpenAlerts?.()}
-          title="Alertes"
-        >
-          <span aria-hidden="true">🔔</span>
+        <button type="button" className="icon-btn" onClick={() => onOpenAlerts?.()} title="Alertes">
+          <AppIcon name="alerts" size={18} />
           <span className="notif-dot" id="notifDot" aria-hidden="true" />
         </button>
 
@@ -88,4 +85,3 @@ export function Topbar({
     </header>
   );
 }
-

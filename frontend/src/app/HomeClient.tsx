@@ -1,51 +1,71 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent } from "@/components/MainContent";
 import { ModalAffect } from "@/components/ModalAffect";
 import { ModalArticle } from "@/components/ModalArticle";
 import { ModalConfirm } from "@/components/ModalConfirm";
 import { ModalEvent } from "@/components/ModalEvent";
-import { ModalReception } from "@/components/ModalReception";
-import { ModalRetour } from "@/components/ModalRetour";
-import { ModalSortie } from "@/components/ModalSortie";
+import { ModalStockMovement } from "@/components/ModalStockMovement";
 import { ModalCategory } from "@/components/ModalCategory";
+import { ModalWarehouse } from "@/components/ModalWarehouse";
+import { ModalWarehouseZones } from "@/components/ModalWarehouseZones";
 import { ModalUser } from "@/components/ModalUser";
 import { Sidebar, type PageId } from "@/components/Sidebar";
-import { Toast } from "@/components/Toast";
+import { isCdcModulePage } from "@/lib/cdc-modules";
 import { Topbar } from "@/components/Topbar";
+import type { MovementUiType } from "@/lib/movement-helpers";
 import {
   createCategoryViaApi,
   deleteArticleViaApi,
   deleteCategoryViaApi,
+  fetchCategoriesWithCounts,
   deleteEventViaApi,
   deleteUserViaApi,
   fetchAuthMe,
+  fetchMovementLocationOptions,
   importCatalogueRowsViaApi,
   loadStateFromBackend,
   getApiOriginForDisplay,
   saveAffectationViaApi,
   saveArticleViaApi,
   saveEventViaApi,
-  saveReceptionViaApi,
+  saveMovementViaApi,
   saveRetourViaApi,
   saveSortieViaApi,
+  toggleCategoryActiveViaApi,
   toggleUserActiveViaApi,
   searchViaApi,
   saveUserViaApi,
   saveProfileViaApi,
   updateCategoryViaApi,
+  deleteWarehouseViaApi,
+  deleteStorageZoneViaApi,
+  deleteShelvingNodeViaApi,
+  deleteStorageLocationViaApi,
+  saveWarehouseViaApi,
+  toggleWarehouseActiveViaApi,
+  type CategoryFormPayload,
+  type CategoryParentPreset,
   type CategoryWithCount,
+  type ShelvingNodeRow,
+  type StorageLocationRow,
+  type StorageZoneRow,
+  type WarehouseFormPayload,
+  type WarehouseRow,
 } from "@/lib/stock/api";
 import { getInputValue, getSelectValue } from "@/lib/stock/dom";
 import {
   buildAffectArticleOptions,
   buildArticleOptions,
+  buildArticleSelectOptions,
   buildEventOptions,
+  buildEventSelectOptions,
   buildUserOptions,
 } from "@/lib/stock/modalOptions";
+import { categoryPathLabel, leafCategories } from "@/lib/category-tree";
 import { globalSearch } from "@/lib/stock/search";
 import { currentUserDisplay, counts } from "@/lib/stock/selectors";
 import {
@@ -56,8 +76,8 @@ import {
   setSessionUserId,
 } from "@/lib/stock/session";
 import { saveState } from "@/lib/stock/storage";
-import type { EventStatus, ReturnCondition, Role, StockState } from "@/lib/stock/types";
-import { useToast } from "@/lib/stock/useToast";
+import type { Article, EventStatus, ReturnCondition, Role, StockState } from "@/lib/stock/types";
+import { ToastProvider, useToast } from "@/lib/stock/useToast";
 
 const SOUND_ENABLED_KEY = "stockevent_sound_enabled";
 const THEME_MODE_KEY = "stockevent_theme_mode";
@@ -71,7 +91,7 @@ const DEFAULT_CATEGORIES = [
   "Autre",
 ];
 
-export default function Home() {
+function HomeApp() {
   const router = useRouter();
 
   /** Évite l’hydratation sur les champs quand une extension (ex. wfd-id) modifie le DOM. */
@@ -87,26 +107,48 @@ export default function Home() {
   const lastSearchActionRef = useRef<string>("");
   const [activePage, setActivePage] = useState<PageId>("dashboard");
 
+  const navigateToPage = useCallback((page: PageId) => {
+    setActivePage(page);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (page === "dashboard") {
+      url.searchParams.delete("page");
+    } else {
+      url.searchParams.set("page", page);
+    }
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, "", next);
+  }, []);
+
   const [articleModalOpen, setArticleModalOpen] = useState(false);
+  const [articleEditing, setArticleEditing] = useState<Article | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [affectModalOpen, setAffectModalOpen] = useState(false);
   const [affectPreset, setAffectPreset] = useState<{ evId: string; evName: string } | null>(null);
-  const [receptionModalOpen, setReceptionModalOpen] = useState(false);
-  const [sortieModalOpen, setSortieModalOpen] = useState(false);
-  const [retourModalOpen, setRetourModalOpen] = useState(false);
+  const [movementModalOpen, setMovementModalOpen] = useState(false);
+  const [movementPreset, setMovementPreset] = useState<MovementUiType>("Entrée");
+  const [movementLocations, setMovementLocations] = useState<Array<{ id: string; label: string }>>([]);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [userModalMode, setUserModalMode] = useState<"create" | "edit">("create");
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [categoryModalMode, setCategoryModalMode] = useState<"create" | "edit">("create");
   const [categoryEditing, setCategoryEditing] = useState<CategoryWithCount | null>(null);
+  const [categoryParentPreset, setCategoryParentPreset] = useState<CategoryParentPreset | null>(null);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryWithCount[]>([]);
   const [categoriesReloadToken, setCategoriesReloadToken] = useState(0);
+  const [warehouseModalOpen, setWarehouseModalOpen] = useState(false);
+  const [warehouseModalMode, setWarehouseModalMode] = useState<"create" | "edit">("create");
+  const [warehouseEditing, setWarehouseEditing] = useState<WarehouseRow | null>(null);
+  const [warehousesReloadToken, setWarehousesReloadToken] = useState(0);
+  const [warehouseZonesOpen, setWarehouseZonesOpen] = useState(false);
+  const [warehouseForZones, setWarehouseForZones] = useState<WarehouseRow | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("Confirmer");
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmLabel, setConfirmLabel] = useState("Supprimer");
-  const { toast, showToast } = useToast();
+  const { showToast } = useToast();
   const confirmCallbackRef = useRef<(() => void) | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -117,11 +159,36 @@ export default function Home() {
   const userOptions = useMemo(() => buildUserOptions(state), [state]);
   const affectArticleOptions = useMemo(() => buildAffectArticleOptions(state), [state]);
   const articleOptions = useMemo(() => buildArticleOptions(state), [state]);
+  const articleSelectOptions = useMemo(() => buildArticleSelectOptions(state), [state]);
+  const eventSelectOptions = useMemo(() => buildEventSelectOptions(state, true), [state]);
   const eventOptions = useMemo(() => buildEventOptions(state, true), [state]);
+
+  const refreshCategoryOptions = useCallback(async () => {
+    try {
+      const rows = await fetchCategoriesWithCounts();
+      setCategoryOptions(rows);
+    } catch {
+      setCategoryOptions([]);
+    }
+  }, []);
+
   const articleCategories = useMemo(() => {
+    if (categoryOptions.length > 0) {
+      const leaves = leafCategories(categoryOptions);
+      return leaves
+        .map((row) => categoryPathLabel(categoryOptions, row.id))
+        .sort((a, b) => a.localeCompare(b, "fr"));
+    }
     const fromArticles = state.articles.map((article) => article.cat).filter(Boolean);
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...fromArticles]));
-  }, [state.articles]);
+  }, [categoryOptions, state.articles]);
+
+  useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+    void refreshCategoryOptions();
+  }, [sessionReady, categoriesReloadToken, refreshCategoryOptions]);
 
   useEffect(() => {
     saveState(state);
@@ -206,6 +273,15 @@ export default function Home() {
   useEffect(() => {
     setClientReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!clientReady) return;
+    const page = new URLSearchParams(window.location.search).get("page");
+    if (!page) return;
+    if (isCdcModulePage(page) || page === "profil") {
+      setActivePage(page as PageId);
+    }
+  }, [clientReady]);
 
   useEffect(() => {
     try {
@@ -302,44 +378,6 @@ export default function Home() {
     }
   }, [affectModalOpen, affectArticleOptions, affectPreset, state.evenements]);
 
-  useEffect(() => {
-    if (!receptionModalOpen) {
-      return;
-    }
-    const articleSelect = document.getElementById("reception-article") as HTMLSelectElement | null;
-    if (articleSelect) {
-      articleSelect.innerHTML = articleOptions;
-    }
-  }, [receptionModalOpen, articleOptions]);
-
-  useEffect(() => {
-    if (!sortieModalOpen) {
-      return;
-    }
-    const articleSelect = document.getElementById("sortie-article") as HTMLSelectElement | null;
-    const eventSelect = document.getElementById("sortie-event") as HTMLSelectElement | null;
-    if (articleSelect) {
-      articleSelect.innerHTML = articleOptions;
-    }
-    if (eventSelect) {
-      eventSelect.innerHTML = eventOptions;
-    }
-  }, [sortieModalOpen, articleOptions, eventOptions]);
-
-  useEffect(() => {
-    if (!retourModalOpen) {
-      return;
-    }
-    const articleSelect = document.getElementById("retour-article") as HTMLSelectElement | null;
-    const eventSelect = document.getElementById("retour-event") as HTMLSelectElement | null;
-    if (articleSelect) {
-      articleSelect.innerHTML = articleOptions;
-    }
-    if (eventSelect) {
-      eventSelect.innerHTML = eventOptions;
-    }
-  }, [retourModalOpen, articleOptions, eventOptions]);
-
   function runGlobalSearch(query: string) {
     const trimmed = query.trim();
     if (!trimmed) {
@@ -352,7 +390,7 @@ export default function Home() {
 
     const localResult = globalSearch(state, trimmed);
     if (localResult) {
-      setActivePage(localResult.page);
+      navigateToPage(localResult.page);
       const key = `${localResult.page}:${localResult.label}`;
       if (lastSearchActionRef.current !== key) {
         lastSearchActionRef.current = key;
@@ -386,7 +424,7 @@ export default function Home() {
           if (!first) {
             return;
           }
-          setActivePage(first.page);
+          navigateToPage(first.page);
           const key = `${first.page}:${first.label}`;
           if (lastSearchActionRef.current !== key) {
             lastSearchActionRef.current = key;
@@ -514,18 +552,6 @@ export default function Home() {
     setThemeMode((prev) => (prev === "dark" ? "light" : "dark"));
   }
 
-  function resetArticleForm() {
-    setFieldValue("art-id", "");
-    setFieldValue("art-nom", "");
-    setFieldValue("art-ref", "");
-    setFieldValue("art-cat", "Mobilier");
-    setFieldValue("art-qty", "0");
-    setFieldValue("art-val", "0");
-    setFieldValue("art-seuil", "5");
-    setFieldValue("art-emoji", "📦");
-    setFieldValue("art-notes", "");
-  }
-
   function resetEventForm() {
     setFieldValue("ev-id", "");
     setFieldValue("ev-nom", "");
@@ -557,15 +583,7 @@ export default function Home() {
       showToast("Article introuvable", "danger");
       return;
     }
-    setFieldValue("art-id", article.id);
-    setFieldValue("art-nom", article.nom);
-    setFieldValue("art-ref", article.ref);
-    setFieldValue("art-cat", article.cat);
-    setFieldValue("art-qty", String(article.qtyTotal));
-    setFieldValue("art-val", String(article.valUnit));
-    setFieldValue("art-seuil", String(article.seuilMin));
-    setFieldValue("art-emoji", article.emoji || "📦");
-    setFieldValue("art-notes", article.notes || "");
+    setArticleEditing(article);
     setArticleModalOpen(true);
   }
 
@@ -599,6 +617,14 @@ export default function Home() {
       setAffectPreset(null);
     }
     setAffectModalOpen(true);
+  }
+
+  function openMovementModal(preset: MovementUiType = "Entrée") {
+    setMovementPreset(preset);
+    setMovementModalOpen(true);
+    void fetchMovementLocationOptions()
+      .then(setMovementLocations)
+      .catch(() => setMovementLocations([]));
   }
 
   function openEditUser(userId: string) {
@@ -883,29 +909,132 @@ export default function Home() {
 
   const canManageUsers =
     state.utilisateurs.find((user) => user.id === state.currentUser)?.role === "Administrateur";
-  const canManageCategories = currentUser.role !== "Lecture seule";
+  const isReadOnlyUser =
+    currentUser.role === "Utilisateur lambda" || currentUser.role === "Lecture seule";
+  const canManageCategories = !isReadOnlyUser;
+  const canManageWarehouses = !isReadOnlyUser;
 
-  function openCategoryModal(mode: "create" | "edit", row?: CategoryWithCount) {
+  function openCategoryModal(
+    mode: "create" | "edit",
+    row?: CategoryWithCount,
+    parentPreset?: CategoryParentPreset,
+  ) {
     setCategoryModalMode(mode);
     setCategoryEditing(row ?? null);
+    setCategoryParentPreset(parentPreset ?? null);
     setCategoryModalOpen(true);
+    void refreshCategoryOptions();
   }
 
-  async function submitCategory(payload: { id?: string; name: string; slug: string }) {
-    if (payload.id) {
-      await updateCategoryViaApi(payload.id, { name: payload.name, slug: payload.slug });
+  async function submitCategory(payload: CategoryFormPayload) {
+    const { id, ...body } = payload;
+    if (id) {
+      await updateCategoryViaApi(id, body);
     } else {
-      await createCategoryViaApi({ name: payload.name, slug: payload.slug });
+      await createCategoryViaApi(body);
     }
     setCategoryModalOpen(false);
+    setCategoryParentPreset(null);
     await refreshStateFromApi();
     setCategoriesReloadToken((t) => t + 1);
     showToast("Catégorie enregistrée", "ok");
   }
 
+  function openWarehouseModal(mode: "create" | "edit", row?: WarehouseRow) {
+    setWarehouseModalMode(mode);
+    setWarehouseEditing(row ?? null);
+    setWarehouseModalOpen(true);
+  }
+
+  function openWarehouseZones(row: WarehouseRow) {
+    setWarehouseForZones(row);
+    setWarehouseZonesOpen(true);
+  }
+
+  function requestDeleteStorageZone(zone: StorageZoneRow) {
+    if (!warehouseForZones) {
+      return;
+    }
+    askConfirm({
+      title: "Supprimer la zone",
+      message: `Supprimer la zone « ${zone.name} » (${zone.code}) ?`,
+      label: "Supprimer",
+      onConfirm: async () => {
+        try {
+          await deleteStorageZoneViaApi(warehouseForZones.id, zone.id);
+          setWarehousesReloadToken((t) => t + 1);
+          showToast("Zone supprimée", "ok");
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+        }
+      },
+    });
+  }
+
+  function requestDeleteShelvingNode(zone: StorageZoneRow, node: ShelvingNodeRow) {
+    if (!warehouseForZones) {
+      return;
+    }
+    askConfirm({
+      title: "Supprimer l'élément",
+      message: `Supprimer « ${node.coordinate} » (${node.levelLabel}) ?`,
+      label: "Supprimer",
+      onConfirm: async () => {
+        try {
+          await deleteShelvingNodeViaApi(warehouseForZones.id, zone.id, node.id);
+          setWarehousesReloadToken((t) => t + 1);
+          showToast("Élément supprimé", "ok");
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+        }
+      },
+    });
+  }
+
+  function requestDeleteStorageLocation(zone: StorageZoneRow, location: StorageLocationRow) {
+    if (!warehouseForZones) {
+      return;
+    }
+    askConfirm({
+      title: "Supprimer l'emplacement",
+      message: `Supprimer l'emplacement « ${location.code} » ?`,
+      label: "Supprimer",
+      onConfirm: async () => {
+        try {
+          await deleteStorageLocationViaApi(warehouseForZones.id, zone.id, location.id);
+          setWarehousesReloadToken((t) => t + 1);
+          showToast("Emplacement supprimé", "ok");
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+        }
+      },
+    });
+  }
+
+  function requestDeleteWarehouse(row: WarehouseRow) {
+    askConfirm({
+      title: "Supprimer le site",
+      message: `Supprimer « ${row.name} » ?`,
+      label: "Supprimer",
+      onConfirm: async () => {
+        try {
+          await deleteWarehouseViaApi(row.id);
+          setWarehousesReloadToken((t) => t + 1);
+          showToast("Site supprimé", "ok");
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+        }
+      },
+    });
+  }
+
   function requestDeleteCategory(row: CategoryWithCount) {
     if (row.itemCount > 0) {
       showToast("Impossible : cette catégorie contient encore des articles.", "danger");
+      return;
+    }
+    if (row.childrenCount > 0) {
+      showToast("Supprimez d’abord les sous-catégories.", "danger");
       return;
     }
     askConfirm({
@@ -931,17 +1060,15 @@ export default function Home() {
         userInitials={currentUser.initials}
         userFullName={currentUser.fullName}
         userAvatarUrl={currentUser.avatarUrl}
-        onOpenAlerts={() => setActivePage("alertes")}
-        onOpenProfile={() => setActivePage("profil")}
+        onOpenAlerts={() => navigateToPage("alertes")}
+        onOpenProfile={() => navigateToPage("profil")}
         onSearchChange={runGlobalSearch}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
       />
       <Sidebar
         activePage={activePage}
-        onNavigate={setActivePage}
-        catalogueCount={appCounts.catalogue}
-        evenementsCount={appCounts.evenements}
+        onNavigate={navigateToPage}
         alertesCount={appCounts.alertes}
         userInitials={currentUser.initials}
         userFullName={currentUser.fullName}
@@ -951,9 +1078,9 @@ export default function Home() {
       <MainContent
         activePage={activePage}
         state={state}
-        onNavigate={setActivePage}
+        onNavigate={navigateToPage}
         onOpenArticleModal={() => {
-          resetArticleForm();
+          setArticleEditing(null);
           setArticleModalOpen(true);
         }}
         onOpenEventModal={() => {
@@ -961,7 +1088,7 @@ export default function Home() {
           setEventModalOpen(true);
         }}
         onOpenAffectModal={openAffectModal}
-        onOpenReceptionModal={() => setReceptionModalOpen(true)}
+        onOpenMovementModal={openMovementModal}
         onToggleUserActive={(userId, active) => {
           void (async () => {
             try {
@@ -973,12 +1100,6 @@ export default function Home() {
             }
           })();
         }}
-        onOpenSortieModal={() => {
-          setSortieModalOpen(true);
-        }}
-        onOpenRetourModal={() => {
-          setRetourModalOpen(true);
-        }}
         onOpenUserModal={() => {
           resetUserForm();
           setUserModalMode("create");
@@ -989,6 +1110,34 @@ export default function Home() {
         categoriesReloadToken={categoriesReloadToken}
         onOpenCategoryModal={openCategoryModal}
         onRequestDeleteCategory={requestDeleteCategory}
+        onToggleCategoryActive={(row, active) => {
+          void (async () => {
+            try {
+              await toggleCategoryActiveViaApi(row.id, active);
+              await refreshStateFromApi();
+              setCategoriesReloadToken((t) => t + 1);
+              showToast(active ? "Catégorie activée" : "Catégorie désactivée", "ok");
+            } catch (error) {
+              showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+            }
+          })();
+        }}
+        canManageWarehouses={canManageWarehouses}
+        warehousesReloadToken={warehousesReloadToken}
+        onOpenWarehouseModal={openWarehouseModal}
+        onManageWarehouseZones={openWarehouseZones}
+        onRequestDeleteWarehouse={requestDeleteWarehouse}
+        onToggleWarehouseActive={(row, active) => {
+          void (async () => {
+            try {
+              await toggleWarehouseActiveViaApi(row.id, active);
+              setWarehousesReloadToken((t) => t + 1);
+              showToast(active ? "Site activé" : "Site désactivé", "ok");
+            } catch (error) {
+              showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+            }
+          })();
+        }}
         onEditArticle={openEditArticle}
         onEditEvent={openEditEvent}
         onEditUser={openEditUser}
@@ -1105,12 +1254,15 @@ export default function Home() {
             showToast("Article introuvable", "danger");
             return;
           }
-          setActivePage("catalogue");
+          navigateToPage("catalogue");
           openEditArticle(article.id);
           showToast(`Préparation de commande pour ${article.nom}`, "ok");
         }}
         onGeneratePackingList={generatePackingList}
         onPrintReport={printReportRich}
+        onRefreshEvents={() => {
+          void refreshStateFromApi();
+        }}
         onSaveProfile={({ prenom, nom, email, avatarUrl, currentPassword, newPassword }) => {
           void (async () => {
             const profile = state.utilisateurs.find((user) => user.id === state.currentUser);
@@ -1137,15 +1289,51 @@ export default function Home() {
         soundEnabled={soundEnabled}
         onToggleSound={toggleSound}
       />
+      <ModalWarehouse
+        isOpen={warehouseModalOpen}
+        mode={warehouseModalMode}
+        initial={warehouseEditing}
+        onClose={() => {
+          setWarehouseModalOpen(false);
+          setWarehouseEditing(null);
+        }}
+        onSubmit={async (payload: WarehouseFormPayload) => {
+          try {
+            const message = await saveWarehouseViaApi(payload);
+            setWarehouseModalOpen(false);
+            setWarehouseEditing(null);
+            setWarehousesReloadToken((t) => t + 1);
+            showToast(message, "ok");
+          } catch (error) {
+            showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+          }
+        }}
+      />
+      <ModalWarehouseZones
+        isOpen={warehouseZonesOpen}
+        warehouse={warehouseForZones}
+        canManage={canManageWarehouses}
+        onClose={() => {
+          setWarehouseZonesOpen(false);
+          setWarehouseForZones(null);
+        }}
+        onZonesChanged={() => setWarehousesReloadToken((t) => t + 1)}
+        onRequestDelete={requestDeleteStorageZone}
+        onRequestDeleteShelving={requestDeleteShelvingNode}
+        onRequestDeleteLocation={requestDeleteStorageLocation}
+        shelvingReloadToken={warehousesReloadToken}
+        locationsReloadToken={warehousesReloadToken}
+      />
       <ModalCategory
         isOpen={categoryModalOpen}
         mode={categoryModalMode}
-        initial={
-          categoryEditing
-            ? { id: categoryEditing.id, name: categoryEditing.name, slug: categoryEditing.slug }
-            : null
-        }
-        onClose={() => setCategoryModalOpen(false)}
+        initial={categoryEditing}
+        parentPreset={categoryParentPreset}
+        parentOptions={categoryOptions}
+        onClose={() => {
+          setCategoryModalOpen(false);
+          setCategoryParentPreset(null);
+        }}
         onSubmit={async (payload) => {
           try {
             await submitCategory(payload);
@@ -1156,24 +1344,19 @@ export default function Home() {
       />
       <ModalArticle
         isOpen={articleModalOpen}
-        onClose={() => setArticleModalOpen(false)}
+        initial={articleEditing}
+        onClose={() => {
+          setArticleModalOpen(false);
+          setArticleEditing(null);
+        }}
         categories={articleCategories}
-        onSave={async () => {
+        onSubmit={async (payload) => {
           try {
-            const message = await saveArticleViaApi({
-              id: getInputValue("art-id") || undefined,
-              nom: getInputValue("art-nom"),
-              ref: getInputValue("art-ref"),
-              cat: getSelectValue("art-cat"),
-              qtyTotal: Number.parseInt(getInputValue("art-qty"), 10) || 0,
-              valUnit: Number.parseFloat(getInputValue("art-val")) || 0,
-              seuilMin: Number.parseInt(getInputValue("art-seuil"), 10) || 5,
-              emoji: getInputValue("art-emoji"),
-              notes: getInputValue("art-notes"),
-            });
+            const message = await saveArticleViaApi(payload);
             await refreshStateFromApi();
             showToast(message, "ok");
             setArticleModalOpen(false);
+            setArticleEditing(null);
           } catch (error) {
             showToast(error instanceof Error ? error.message : "Action impossible", "danger");
           }
@@ -1227,60 +1410,35 @@ export default function Home() {
           }
         }}
       />
-      <ModalReception
-        isOpen={receptionModalOpen}
-        onClose={() => setReceptionModalOpen(false)}
-        onSave={async () => {
+      <ModalStockMovement
+        isOpen={movementModalOpen}
+        preset={movementPreset}
+        articleOptions={articleSelectOptions}
+        eventOptions={eventSelectOptions}
+        locationOptions={movementLocations}
+        onClose={() => setMovementModalOpen(false)}
+        onSubmit={async (payload) => {
           try {
-            const message = await saveReceptionViaApi({
-              artId: getSelectValue("reception-article"),
-              qty: Number.parseInt(getInputValue("reception-qty"), 10) || 1,
-              note: getInputValue("reception-note"),
+            const message = await saveMovementViaApi({
+              movementType: payload.movementType,
+              movementReason: payload.movementReason,
+              artId: payload.artId,
+              qty: payload.qty,
+              evId: payload.evId,
+              note: payload.note,
+              etat: payload.etat,
+              fromLocationId: payload.fromLocationId,
+              toLocationId: payload.toLocationId,
+              countedQty: payload.countedQty,
+              cdcCorrection: payload.cdcCorrection,
+              cdcCorrectionNote: payload.cdcCorrectionNote,
             });
             await refreshStateFromApi();
             showToast(message, "ok");
-            setReceptionModalOpen(false);
+            setMovementModalOpen(false);
           } catch (error) {
             showToast(error instanceof Error ? error.message : "Action impossible", "danger");
-          }
-        }}
-      />
-      <ModalSortie
-        isOpen={sortieModalOpen}
-        onClose={() => setSortieModalOpen(false)}
-        onSave={async () => {
-          try {
-            const message = await saveSortieViaApi({
-              artId: getSelectValue("sortie-article"),
-              qty: Number.parseInt(getInputValue("sortie-qty"), 10) || 1,
-              evId: getSelectValue("sortie-event"),
-              note: getInputValue("sortie-note"),
-            });
-            await refreshStateFromApi();
-            showToast(message, "ok");
-            setSortieModalOpen(false);
-          } catch (error) {
-            showToast(error instanceof Error ? error.message : "Action impossible", "danger");
-          }
-        }}
-      />
-      <ModalRetour
-        isOpen={retourModalOpen}
-        onClose={() => setRetourModalOpen(false)}
-        onSave={async () => {
-          try {
-            const message = await saveRetourViaApi({
-              artId: getSelectValue("retour-article"),
-              qty: Number.parseInt(getInputValue("retour-qty"), 10) || 1,
-              evId: getSelectValue("retour-event"),
-              etat: (getSelectValue("retour-etat") || "Bon état") as ReturnCondition,
-              note: getInputValue("retour-note"),
-            });
-            await refreshStateFromApi();
-            showToast(message, "ok");
-            setRetourModalOpen(false);
-          } catch (error) {
-            showToast(error instanceof Error ? error.message : "Action impossible", "danger");
+            throw error;
           }
         }}
       />
@@ -1374,7 +1532,14 @@ export default function Home() {
           confirmCallbackRef.current = null;
         }}
       />
-      <Toast message={toast.message} visible={toast.visible} type={toast.type} />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <ToastProvider>
+      <HomeApp />
+    </ToastProvider>
   );
 }

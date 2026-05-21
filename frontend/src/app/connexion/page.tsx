@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   fetchAuthMe,
   loginViaApi,
+  verifyTwoFactorViaApi,
 } from "@/lib/stock/api";
 import { setSessionUserId } from "@/lib/stock/session";
 
@@ -16,6 +17,8 @@ export default function ConnexionPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needs2Fa, setNeeds2Fa] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
 
   const verifyExistingSession = useCallback(async () => {
     setCheckingSession(true);
@@ -48,8 +51,12 @@ export default function ConnexionPage() {
     }
     setSubmitting(true);
     try {
-      const { user } = await loginViaApi(id, password);
-      setSessionUserId(user.id);
+      const result = await loginViaApi(id, password);
+      if ("needsTwoFactor" in result && result.needsTwoFactor) {
+        setNeeds2Fa(true);
+        return;
+      }
+      setSessionUserId(result.user.id);
       router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");
@@ -95,7 +102,41 @@ export default function ConnexionPage() {
             </div>
           ) : null}
 
-          <form className="auth-form" onSubmit={(e) => void handleSubmit(e)}>
+          {needs2Fa ? (
+            <form
+              className="auth-form form-premium"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setError(null);
+                setSubmitting(true);
+                void verifyTwoFactorViaApi(totpCode)
+                  .then(({ user }) => {
+                    setSessionUserId(user.id);
+                    router.replace("/");
+                  })
+                  .catch((err) => setError(err instanceof Error ? err.message : "Code invalide"))
+                  .finally(() => setSubmitting(false));
+              }}
+            >
+              <p className="auth-card-desc">Saisissez le code de votre application Authenticator.</p>
+              <div className="fg full">
+                <label htmlFor="totp-code">Code à 6 chiffres</label>
+                <input
+                  id="totp-code"
+                  className="fi"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <button className="btn btn-gold auth-submit" type="submit" disabled={submitting}>
+                {submitting ? "Vérification…" : "Valider"}
+              </button>
+            </form>
+          ) : (
+          <form className="auth-form form-premium" onSubmit={(e) => void handleSubmit(e)}>
             <div className="fg full">
               <label htmlFor="login-identifier">Identifiant (nom d’utilisateur ou e-mail)</label>
               <input
@@ -126,6 +167,7 @@ export default function ConnexionPage() {
               {submitting ? "Connexion…" : "Se connecter"}
             </button>
           </form>
+          )}
         </section>
       </div>
     </div>

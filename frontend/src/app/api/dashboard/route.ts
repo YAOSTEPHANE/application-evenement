@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
+import { computeStockLevelStatus, isStockAlertStatus, stockLevelsFromDb } from "@/lib/stock-level-helpers";
 
 function utcDayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -47,7 +48,18 @@ export async function GET() {
     }),
     prisma.item.findMany({
       where: { organizationId },
-      select: { id: true, name: true, availableQty: true, minThreshold: true, reference: true },
+      select: {
+        id: true,
+        name: true,
+        availableQty: true,
+        minThreshold: true,
+        maxStockQty: true,
+        safetyStockQty: true,
+        optimalStockQty: true,
+        alertThresholdQty: true,
+        criticalThresholdQty: true,
+        reference: true,
+      },
       orderBy: { availableQty: "asc" },
       take: 10,
     }),
@@ -67,7 +79,11 @@ export async function GET() {
     }),
   ]);
 
-  const alerts = criticalItems.filter((item) => item.availableQty <= item.minThreshold);
+  const alerts = criticalItems.filter((item) =>
+    isStockAlertStatus(
+      computeStockLevelStatus(item.availableQty, stockLevelsFromDb(item)),
+    ),
+  );
   const stockValueEstimate = itemsForValue.reduce(
     (sum, row) => sum + row.unitValue * row.totalQuantity,
     0,

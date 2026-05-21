@@ -4,6 +4,12 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AnalyticsRapports } from "@/components/AnalyticsRapports";
+import { ArticlesCatalogPage } from "@/components/ArticlesCatalogPage";
+import { CategoriesAdminPage } from "@/components/CategoriesAdminPage";
+import { DashboardModulePage } from "@/components/DashboardModulePage";
+import { CdcModulePages, type CdcPageId } from "@/components/CdcModulePages";
+import { isCdcModulePage } from "@/lib/cdc-modules";
+import { CDC_ROLE_PROFILES } from "@/lib/cdc-role-profiles";
 import {
   ActivityAreaChart,
   CategoryDonut,
@@ -12,14 +18,16 @@ import {
 } from "@/components/AnalyticsCharts";
 import {
   fetchAuditLogsFromApi,
-  fetchCategoriesWithCounts,
   fetchDashboardFromApi,
+  type CategoryParentPreset,
   type CategoryWithCount,
   type DashboardResponse,
 } from "@/lib/stock/api";
 import { dispo, fmt, fmtNum, fmtTime } from "@/lib/stock/helpers";
 import type { Evenement, StockState } from "@/lib/stock/types";
 import type { AuditLogsResponse } from "@/lib/stock/api";
+
+import type { MovementUiType } from "@/lib/movement-helpers";
 
 import type { PageId } from "./Sidebar";
 
@@ -30,9 +38,18 @@ type MainContentProps = {
   onOpenArticleModal: () => void;
   onOpenEventModal: () => void;
   onOpenAffectModal: (eventId?: string, eventName?: string) => void;
-  onOpenReceptionModal: () => void;
-  onOpenSortieModal: () => void;
-  onOpenRetourModal: () => void;
+  onOpenReceptionModal?: () => void;
+  onOpenSortieModal?: () => void;
+  onOpenRetourModal?: () => void;
+  /** Alias unifié (HomeClient) — utilisé si les modales séparées ne sont pas fournies. */
+  onOpenMovementModal?: (preset?: MovementUiType) => void;
+  canManageWarehouses?: boolean;
+  warehousesReloadToken?: number;
+  onOpenWarehouseModal?: (mode: "create" | "edit", row?: import("@/lib/stock/api").WarehouseRow) => void;
+  onManageWarehouseZones?: (row: import("@/lib/stock/api").WarehouseRow) => void;
+  onRequestDeleteWarehouse?: (row: import("@/lib/stock/api").WarehouseRow) => void;
+  onToggleWarehouseActive?: (row: import("@/lib/stock/api").WarehouseRow, active: boolean) => void;
+  onToggleCategoryActive?: (row: CategoryWithCount, active: boolean) => void;
   onToggleUserActive: (userId: string, active: boolean) => void;
   onOpenUserModal: () => void;
   /** Réservé aux administrateurs : création / édition / suppression d’utilisateurs. */
@@ -40,7 +57,11 @@ type MainContentProps = {
   /** Hors « Lecture seule » : CRUD catégories. */
   canManageCategories: boolean;
   categoriesReloadToken: number;
-  onOpenCategoryModal: (mode: "create" | "edit", row?: CategoryWithCount) => void;
+  onOpenCategoryModal: (
+    mode: "create" | "edit",
+    row?: CategoryWithCount,
+    parentPreset?: CategoryParentPreset,
+  ) => void;
   onRequestDeleteCategory: (row: CategoryWithCount) => void;
   onDeleteArticle: (articleId: string) => void;
   onDeleteEvent: (eventId: string) => void;
@@ -65,6 +86,7 @@ type MainContentProps = {
     currentPassword?: string;
     newPassword?: string;
   }) => void;
+  onRefreshEvents?: () => void;
 };
 
 const pageClass = (activePage: PageId, page: PageId) =>
@@ -94,20 +116,17 @@ const etatBadgeClass = (etat: string) => {
 
 const roleBadgeClass: Record<string, string> = {
   Administrateur: "badge-danger",
+  Commercial: "badge-info",
+  "Gestionnaire de stock": "badge-warn",
+  "Resp. technique": "badge-info",
+  "Resp. parc camion": "badge-info",
+  "Technicien / monteur": "badge-gray",
+  "Utilisateur lambda": "badge-gray",
+  "Supervision (hérité)": "badge-warn",
   Gestionnaire: "badge-warn",
-  Magasinier: "badge-info",
+  Magasinier: "badge-warn",
   "Lecture seule": "badge-gray",
 };
-
-const DEFAULT_CATEGORIES = [
-  "Mobilier",
-  "Audiovisuel",
-  "Vaisselle",
-  "Décoration",
-  "Textile",
-  "Éclairage",
-  "Autre",
-];
 
 function dashboardSeries(movements: StockState["mouvements"], days: number): SeriesPoint[] {
   const dayKeys: string[] = [];
@@ -161,6 +180,7 @@ export function MainContent({
   onOpenReceptionModal,
   onOpenSortieModal,
   onOpenRetourModal,
+  onOpenMovementModal,
   onToggleUserActive,
   onOpenUserModal,
   canManageUsers,
@@ -168,6 +188,7 @@ export function MainContent({
   categoriesReloadToken,
   onOpenCategoryModal,
   onRequestDeleteCategory,
+  onToggleCategoryActive,
   onDeleteArticle,
   onDeleteEvent,
   onDeleteUser,
@@ -184,12 +205,11 @@ export function MainContent({
   onGeneratePackingList,
   onPrintReport,
   onSaveProfile,
+  onRefreshEvents,
 }: MainContentProps) {
   const [scanRef, setScanRef] = useState("");
   const [scanQty, setScanQty] = useState(1);
   const [scanEventId, setScanEventId] = useState("");
-  const [catalogueSearch, setCatalogueSearch] = useState("");
-  const [catalogueFilter, setCatalogueFilter] = useState("");
   const [movementFilter, setMovementFilter] = useState("");
   const [topPeriodDays, setTopPeriodDays] = useState<7 | 14 | 30>(14);
   const [profileAvatarDataUrl, setProfileAvatarDataUrl] = useState("");
@@ -204,9 +224,6 @@ export function MainContent({
   const [dashData, setDashData] = useState<DashboardResponse | null>(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashErr, setDashErr] = useState<string | null>(null);
-  const [categoryRows, setCategoryRows] = useState<CategoryWithCount[]>([]);
-  const [categoryLoading, setCategoryLoading] = useState(false);
-  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const auditHasMore = auditTotal != null && auditLogs.length < auditTotal;
 
@@ -263,35 +280,6 @@ export function MainContent({
       cancel = true;
     };
   }, [activePage]);
-
-  useEffect(() => {
-    if (activePage !== "categories") {
-      return;
-    }
-    let cancel = false;
-    setCategoryLoading(true);
-    setCategoryError(null);
-    void fetchCategoriesWithCounts()
-      .then((rows) => {
-        if (!cancel) {
-          setCategoryRows(rows);
-        }
-      })
-      .catch((e) => {
-        if (!cancel) {
-          setCategoryError(e instanceof Error ? e.message : "Impossible de charger les catégories");
-          setCategoryRows([]);
-        }
-      })
-      .finally(() => {
-        if (!cancel) {
-          setCategoryLoading(false);
-        }
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [activePage, categoriesReloadToken]);
 
   const activeEvents = state.evenements.filter((event) => event.statut !== "Terminé" && event.statut !== "Annulé");
   const alerts = state.articles.filter((article) => dispo(article) <= article.seuilMin);
@@ -356,21 +344,6 @@ export function MainContent({
     () => state.articles.find((article) => article.ref.toLowerCase() === scanRef.trim().toLowerCase()),
     [scanRef, state.articles],
   );
-  const filteredArticles = useMemo(() => {
-    const query = catalogueSearch.trim().toLowerCase();
-    return state.articles.filter((article) => {
-      const matchCategory = !catalogueFilter || article.cat === catalogueFilter;
-      const matchQuery =
-        !query ||
-        article.nom.toLowerCase().includes(query) ||
-        article.ref.toLowerCase().includes(query);
-      return matchCategory && matchQuery;
-    });
-  }, [catalogueFilter, catalogueSearch, state.articles]);
-  const catalogueCategories = useMemo(() => {
-    const uniqueCategories = Array.from(new Set(state.articles.map((article) => article.cat).filter(Boolean)));
-    return Array.from(new Set([...DEFAULT_CATEGORIES, ...uniqueCategories]));
-  }, [state.articles]);
   const filteredMovements = useMemo(() => {
     if (!movementFilter) {
       return state.mouvements;
@@ -523,606 +496,50 @@ export function MainContent({
     URL.revokeObjectURL(url);
   }
 
-  function exportCatalogueCsv() {
-    const rows = [
-      ["Référence", "Désignation", "Catégorie", "Qté Totale", "Disponible", "Affecté", "Valeur Unit.", "Seuil Min", "Notes"],
-      ...filteredArticles.map((article) => [
-        article.ref,
-        article.nom,
-        article.cat,
-        String(article.qtyTotal),
-        String(dispo(article)),
-        String(article.qtyAff),
-        String(article.valUnit),
-        String(article.seuilMin),
-        article.notes ?? "",
-      ]),
-    ];
-    const csv = rows
-      .map((row) => row.map((cell) => `"${cell.replaceAll("\"", "\"\"")}"`).join(","))
-      .join("\n");
-    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "stockevent_catalogue.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function openCsvPicker() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".csv,text/csv";
-    input.onchange = (event) => {
-      const target = event.target as HTMLInputElement;
-      const file = target.files?.[0];
-      if (file) {
-        onImportCsv(file);
-      }
-    };
-    input.click();
-  }
-
   return (
     <main id="main">
       <div id="page-dashboard" className={pageClass(activePage, "dashboard")}>
-        <div className="ph">
-          <div className="ph-left">
-            <div className="ph-title">Tableau de bord</div>
-            <div className="ph-sub">
-              Vision unifiée de l&apos;inventaire, des événements et des opérations en cours.
-            </div>
-          </div>
-          <div className="ph-actions">
-            <button className="btn btn-outline btn-sm" type="button" onClick={exportAlertsCsv}>
-              ↓ Exporter alertes
-            </button>
-            <button className="btn btn-gold" type="button" onClick={onOpenArticleModal}>
-              + Nouvel article
-            </button>
-          </div>
-        </div>
-
-        <div className="dash-hero">
-          <div className="dash-hero-glow" aria-hidden />
-          <div className="dash-hero-main">
-            <p className="dash-hero-eyebrow">Pilotage opérationnel</p>
-            <h2 className="dash-hero-title">
-              Performance stock en temps réel, prête pour vos prochains événements.
-            </h2>
-            <p className="dash-hero-sub">
-              Priorisez les réapprovisionnements, sécurisez les sorties et gardez une vision claire sur la valeur de
-              votre parc.
-            </p>
-            <div className="dash-hero-pills">
-              <span className="dash-pill">{fmtNum(totalUnits)} unités</span>
-              <span className="dash-pill">{fmtNum(state.evenements.length)} événements</span>
-              <span className="dash-pill">{stockCoverageRate}% couverture</span>
-            </div>
-          </div>
-          <div className="dash-hero-side">
-            <div className="dash-hero-kpi">
-              <span className="dash-hero-kpi-label">Valeur du stock</span>
-              <strong className="dash-hero-kpi-value">{fmtNum(heroStockValue)}</strong>
-              <span className="dash-hero-kpi-unit">F CFA</span>
-            </div>
-            <div className="dash-hero-kpi dash-hero-kpi-alt">
-              <span className="dash-hero-kpi-label">Alertes critiques</span>
-              <strong className="dash-hero-kpi-value">{fmtNum(heroAlertsCount)}</strong>
-              <span className="dash-hero-kpi-unit">articles à traiter</span>
-            </div>
-            <div className="dash-hero-event">
-              <span className="dash-hero-event-label">Prochain jalon opérationnel</span>
-              <strong className="dash-hero-event-title">{nextEvent ? nextEvent.nom : "Aucun événement planifié"}</strong>
-              <span className="dash-hero-event-sub">
-                {nextEvent
-                  ? `${fmt(nextEvent.debut)} · ${nextEventItemsOut} unité(s) déjà sorties`
-                  : "Créez un événement pour lancer la planification logistique."}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="metrics">
-          <div className="mc mc-navy">
-            <div className="mc-accent" />
-            <div className="mc-label">Articles en stock</div>
-            <div className="mc-value">{state.articles.length}</div>
-            <div className="mc-sub">{fmtNum(state.articles.reduce((sum, article) => sum + article.qtyTotal, 0))} unités</div>
-          </div>
-          <div className="mc mc-gold">
-            <div className="mc-accent" />
-            <div className="mc-label">Événements actifs</div>
-            <div className="mc-value">{metricsActiveEvents}</div>
-            <div className="mc-sub">sur {state.evenements.length} événements</div>
-          </div>
-          <div className="mc mc-ok">
-            <div className="mc-accent" />
-            <div className="mc-label">Articles affectés</div>
-            <div className="mc-value">{fmtNum(affectedCount)}</div>
-            <div className="mc-sub">en cours d&apos;utilisation</div>
-          </div>
-          <div className="mc mc-warn">
-            <div className="mc-accent" />
-            <div className="mc-label">Alertes actives</div>
-            <div className="mc-value">{alerts.length}</div>
-            <div className="mc-sub">{fmtNum(stockValue)} F CFA de valeur stock</div>
-          </div>
-        </div>
-
-        <div className="dash-insights">
-          <div className="dash-insight-card">
-            <div className="dash-insight-label">Taux d&apos;affectation</div>
-            <div className="dash-insight-value">{insightAllocationRate}%</div>
-            <div className="dash-insight-sub">{fmtNum(affectedCount)} unités engagées sur {fmtNum(totalUnits)}</div>
-            <div className="dash-insight-meter" aria-hidden>
-              <progress className="dash-insight-meter-progress" value={allocationRate} max={100} />
-            </div>
-          </div>
-          <div className="dash-insight-card">
-            <div className="dash-insight-label">Couverture de stock</div>
-            <div className="dash-insight-value">
-              {stockCoverageRate}%
-            </div>
-            <div className="dash-insight-sub">
-              {fmtNum(availableUnits)} unités disponibles sur {fmtNum(totalUnits)}
-            </div>
-            <div className="dash-insight-meter" aria-hidden>
-              <progress className="dash-insight-meter-progress" value={stockCoverageRate} max={100} />
-            </div>
-          </div>
-          <div className="dash-insight-card">
-            <div className="dash-insight-label">Pression alertes</div>
-            <div className="dash-insight-value">
-              {alertRate}%
-            </div>
-            <div className="dash-insight-sub">
-              {lastMovement
-                ? `Dernier mouvement: ${lastMovement.type} · ${fmtTime(lastMovement.date)}`
-                : "Aucun mouvement enregistré pour le moment."}
-            </div>
-            <div className="dash-insight-meter" aria-hidden>
-              <progress className="dash-insight-meter-progress" value={Math.min(alertRate, 100)} max={100} />
-            </div>
-          </div>
-        </div>
-
-        <div className="dash-charts">
-          <section className="card card-pad">
-            <div className="card-title">
-              <h3>▦ Tendance des mouvements ({topPeriodDays} jours)</h3>
-              <div className="dash-top-controls" role="group" aria-label="Période des graphiques">
-                {[7, 14, 30].map((days) => (
-                  <button
-                    key={`series-${days}`}
-                    type="button"
-                    className={`filt${topPeriodDays === days ? " active" : ""}`}
-                    onClick={() => setTopPeriodDays(days as 7 | 14 | 30)}
-                  >
-                    {days}j
-                  </button>
-                ))}
-              </div>
-            </div>
-            <ActivityAreaChart series={dashActivitySeries} loading={dashLoading && !dashData} />
-          </section>
-          <section className="card card-pad">
-            <div className="card-title">
-              <h3>◌ Répartition du stock</h3>
-            </div>
-            <CategoryDonut distribution={reportStats.categoryDistribution} />
-            <div className="mt12">
-              <MovementMixBars mix={dashMovementMix} loading={dashLoading && !dashData} />
-            </div>
-          </section>
-        </div>
-
-        <section className="card card-pad dash-top-chart">
-          <div className="card-title">
-            <h3>▲ Top 5 articles les plus sortis</h3>
-              <span className="dash-top-caption">{topPeriodDays} derniers jours</span>
-          </div>
-          {dashboardTopArticles.length === 0 ? (
-            <div className="empty-state">
-              <p>Aucune sortie enregistrée sur {topPeriodDays} jour(s).</p>
-            </div>
-          ) : (
-            <div className="dash-top-list">
-              {dashboardTopArticles.map((item, index) => (
-                <div key={item.id} className="dash-top-row">
-                  <div className="dash-top-rank">{index + 1}</div>
-                  <div className="dash-top-main">
-                    <div className="dash-top-name">{item.article?.nom ?? "Article"}</div>
-                    <div className="dash-top-ref">{item.article?.ref || "Réf. —"}</div>
-                    <progress
-                      className="progress-meter progress-meter-info dash-top-bar"
-                      value={item.qty}
-                      max={dashboardTopMax}
-                    />
-                  </div>
-                  <div className="dash-top-val">{fmtNum(item.qty)}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <div className="dash-layout">
-          <div className="dash-col">
-            <div className="card card-pad">
-              <div className="card-title">
-                <h3>⚠ Alertes actives</h3>
-                <a onClick={() => onNavigate("alertes")} role="button">
-                  Tout voir →
-                </a>
-              </div>
-              <div>
-                {alerts.length === 0 ? (
-                  <div className="empty-state">
-                    <p>Aucune alerte active.</p>
-                  </div>
-                ) : (
-                  alerts.slice(0, 5).map((article) => (
-                    <div key={article.id} className={`alert-item${dispo(article) === 0 ? " crit" : ""}`}>
-                      <span className="alert-icon">{article.emoji || "📦"}</span>
-                      <div className="alert-body">
-                        <div className="alert-text">
-                          <strong>{article.nom}</strong> — {dispo(article) === 0 ? "Rupture de stock" : "Stock critique"} :{" "}
-                          {dispo(article)} restant(s)
-                        </div>
-                        <div className="alert-sub">Seuil minimum : {article.seuilMin} · Réf. {article.ref || "N/A"}</div>
-                      </div>
-                      <button className="btn btn-xs btn-outline" type="button" onClick={() => onOrderArticle(article.id)}>
-                        Commander
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="card card-overflow-hidden card-pad-none">
-              <div className="card-pad card-pad-no-bottom">
-                <div className="card-title">
-                  <h3>◈ Prochains événements</h3>
-                  <a onClick={() => onNavigate("evenements")} role="button">
-                    Calendrier →
-                  </a>
-                </div>
-              </div>
-              <div className="tbl-wrap">
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th>Événement</th>
-                      <th>Date</th>
-                      <th>Lieu</th>
-                      <th>Articles</th>
-                      <th>Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeEvents.slice(0, 5).map((event) => (
-                      <tr key={event.id}>
-                        <td>
-                          <strong>{event.nom}</strong>
-                          <br />
-                          <span className="fs11 fc-3">{event.client || "—"}</span>
-                        </td>
-                        <td>{fmt(event.debut)}</td>
-                        <td>{event.lieu || "—"}</td>
-                        <td>{fmtNum(event.itemsAffectes)}</td>
-                        <td>
-                          <span className={`badge ${eventStatusClass[event.statut] ?? "badge-gray"}`}>{event.statut}</span>
-                        </td>
-                      </tr>
-                    ))}
-                    {activeEvents.length === 0 ? (
-                      <tr>
-                        <td colSpan={5}>Aucun événement actif.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div className="dash-col">
-            <div className="card card-pad">
-              <div className="card-title">
-                <h3>◉ Disponibilité stock</h3>
-              </div>
-              <div>
-                {state.articles.slice(0, 6).map((article) => {
-                  const available = dispo(article);
-                  const total = Math.max(1, article.qtyTotal);
-                  const ratioClass = available <= Math.floor(total * 0.25) ? "progress-meter-danger" : "progress-meter-ok";
-                  return (
-                    <div key={article.id} className="gauge-item">
-                      <div className="gauge-ico">{article.emoji || "📦"}</div>
-                      <div className="gauge-info">
-                        <div className="gauge-name">{article.nom}</div>
-                        <div className="gauge-nums">
-                          {available} / {article.qtyTotal} disponibles
-                        </div>
-                      </div>
-                      <div className="gauge-bar">
-                        <div className="gauge-pct">
-                          {Math.round((available / total) * 100)}%
-                        </div>
-                        <progress className={`progress-meter ${ratioClass}`} value={available} max={total} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="card card-pad dash-action-card">
-              <div className="card-title">
-                <h3>⚡ Actions rapides</h3>
-              </div>
-              <div className="dash-action-grid">
-                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenSortieModal}>
-                  ↗ Nouvelle sortie
-                </button>
-                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenRetourModal}>
-                  ↩ Enregistrer retour
-                </button>
-                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenReceptionModal}>
-                  + Réception stock
-                </button>
-                <button className="btn btn-outline btn-sm" type="button" onClick={() => onOpenAffectModal()}>
-                  ◈ Affecter articles
-                </button>
-                <button className="btn btn-outline btn-sm" type="button" onClick={onOpenEventModal}>
-                  ◈ Créer événement
-                </button>
-                <button className="btn btn-gold btn-sm" type="button" onClick={() => onNavigate("alertes")}>
-                  ◬ Traiter alertes
-                </button>
-              </div>
-              <div className="dash-action-foot">
-                Valeur en stock critique: <strong>{fmtNum(criticalStockValue)} F CFA</strong>
-              </div>
-            </div>
-
-            <div className="card card-pad">
-              <div className="card-title">
-                <h3>⇄ Activité récente</h3>
-                <a onClick={() => onNavigate("mouvements")} role="button">
-                  Tout voir →
-                </a>
-              </div>
-              <div className="tl-wrap">
-                {state.mouvements.slice(0, 8).map((movement) => {
-                  const article = state.articles.find((a) => a.id === movement.articleId);
-                  const dotClass =
-                    movement.type === "Retour"
-                      ? "tl-dot-ok"
-                      : movement.type === "Sortie"
-                        ? "tl-dot-info"
-                        : movement.type === "Réception"
-                          ? "tl-dot-gold"
-                          : "tl-dot-danger";
-                  return (
-                    <div key={movement.id} className="tl-item">
-                      <div className={`tl-dot ${dotClass}`} />
-                      <div className="tl-main">
-                        <div className="tl-title">
-                          {movement.type} • {article?.nom ?? "Article"}
-                        </div>
-                        <div className="tl-sub">
-                          {movement.qty} unité(s) • {fmtTime(movement.date)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
+        {activePage === "dashboard" ? (
+          <DashboardModulePage
+            state={state}
+            onNavigate={onNavigate}
+            onOpenArticleModal={onOpenArticleModal}
+            onOpenEventModal={onOpenEventModal}
+            onOpenAffectModal={onOpenAffectModal}
+            onOpenSortieModal={onOpenSortieModal ?? (() => onOpenMovementModal?.("Sortie"))}
+            onOpenReceptionModal={onOpenReceptionModal ?? (() => onOpenMovementModal?.("Entrée"))}
+            onOpenRetourModal={onOpenRetourModal ?? (() => onOpenMovementModal?.("Retour"))}
+            onOrderArticle={onOrderArticle}
+          />
+        ) : null}
       </div>
 
       <div id="page-catalogue" className={pageClass(activePage, "catalogue")}>
-        <div className="ph">
-          <div className="ph-left">
-            <div className="ph-title">Catalogue d&apos;articles</div>
-            <div className="ph-sub">{state.articles.length} article(s)</div>
-          </div>
-          <div className="ph-actions">
-            <button className="btn btn-outline btn-sm" type="button" onClick={() => onNavigate("categories")}>
-              ▤ Catégories
-            </button>
-            <button className="btn btn-outline btn-sm" type="button" onClick={openCsvPicker}>
-              ↑ Import CSV
-            </button>
-            <button className="btn btn-outline btn-sm" type="button" onClick={exportCatalogueCsv}>
-              ↓ Export CSV
-            </button>
-            <button className="btn btn-outline btn-sm" type="button" onClick={onOpenReceptionModal}>
-              + Réception
-            </button>
-            <button className="btn btn-gold" type="button" onClick={onOpenArticleModal}>
-              + Nouvel article
-            </button>
-          </div>
-        </div>
-
-        <div className="filter-bar">
-          <input
-            className="search-bar"
-            type="text"
-            id="catSearch"
-            placeholder="Rechercher…"
-            value={catalogueSearch ?? ""}
-            onChange={(event) => setCatalogueSearch(event.target.value)}
+        {activePage === "catalogue" ? (
+          <ArticlesCatalogPage
+            articles={state.articles}
+            onNavigate={onNavigate}
+            onOpenArticleModal={onOpenArticleModal}
+            onEditArticle={onEditArticle}
+            onDeleteArticle={onDeleteArticle}
+            onImportCsv={onImportCsv}
+            onOpenReceptionModal={onOpenReceptionModal}
+            onOpenMovementModal={onOpenMovementModal}
           />
-          {["", ...catalogueCategories].map((category) => (
-            <button
-              key={category || "all"}
-              className={`filt${catalogueFilter === category ? " active" : ""}`}
-              type="button"
-              onClick={() => setCatalogueFilter(category)}
-            >
-              {category || "Tout"}
-            </button>
-          ))}
-        </div>
-
-        <div className="card card-overflow-hidden">
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Réf.</th>
-                  <th>Désignation</th>
-                  <th>Catégorie</th>
-                  <th>Total</th>
-                  <th>Disponible</th>
-                  <th>Affecté</th>
-                  <th>Valeur unit. (F)</th>
-                  <th>Alerte min.</th>
-                  <th>Statut</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredArticles.map((article) => (
-                  <tr key={article.id}>
-                    <td>
-                      <div className="item-thumb">{article.emoji || "📦"}</div>
-                    </td>
-                    <td>
-                      <span className="ref-code">{article.ref}</span>
-                    </td>
-                    <td>
-                      <strong>{article.nom}</strong>
-                      {article.notes ? <><br /><span className="fs11 fc-3">{article.notes.slice(0, 50)}{article.notes.length > 50 ? "…" : ""}</span></> : null}
-                    </td>
-                    <td>
-                      <span className="badge badge-navy">{article.cat}</span>
-                    </td>
-                    <td className="fw500">{fmtNum(article.qtyTotal)}</td>
-                    <td className={dispo(article) === 0 ? "fc-danger fw600" : dispo(article) <= article.seuilMin ? "fc-warn fw600" : "fc-ok fw500"}>{fmtNum(dispo(article))}</td>
-                    <td>{fmtNum(article.qtyAff)}</td>
-                    <td>{fmtNum(article.valUnit)}</td>
-                    <td>{fmtNum(article.seuilMin)}</td>
-                    <td>{dispo(article) === 0 ? <span className="badge badge-danger">Rupture</span> : dispo(article) <= article.seuilMin ? <span className="badge badge-warn">Critique</span> : <span className="badge badge-ok">Disponible</span>}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button className="btn btn-outline btn-xs" type="button" onClick={() => onEditArticle(article.id)}>
-                          Modifier
-                        </button>{" "}
-                        <button className="btn btn-danger btn-xs" type="button" onClick={() => onDeleteArticle(article.id)}>
-                          Suppr.
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {filteredArticles.length === 0 ? (
-            <div id="cat-empty" className="empty-state">
-              <div className="empty-icon">◉</div>
-              <h3>Aucun article trouvé</h3>
-              <p>Ajoutez votre premier article ou modifiez votre recherche.</p>
-              <button className="btn btn-gold mt8" type="button" onClick={onOpenArticleModal}>
-                + Ajouter un article
-              </button>
-            </div>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
       <div id="page-categories" className={pageClass(activePage, "categories")}>
-        <div className="ph">
-          <div className="ph-left">
-            <div className="ph-title">Catégories</div>
-            <div className="ph-sub">Référentiel utilisé par le catalogue et les analyses</div>
-          </div>
-          <div className="ph-actions">
-            {canManageCategories ? (
-              <button className="btn btn-gold" type="button" onClick={() => onOpenCategoryModal("create")}>
-                + Nouvelle catégorie
-              </button>
-            ) : null}
-          </div>
-        </div>
-        <div className="card card-pad cat-admin-card">
-          {categoryLoading ? (
-            <div className="fs12 fc-3">Chargement des catégories…</div>
-          ) : categoryError ? (
-            <div className="auth-error" role="alert">
-              {categoryError}
-            </div>
-          ) : categoryRows.length === 0 ? (
-            <div className="empty-state cat-admin-empty">
-              <div className="empty-icon">▤</div>
-              <h3>Aucune catégorie</h3>
-              <p>Créez une catégorie pour classer vos articles.</p>
-              {canManageCategories ? (
-                <button className="btn btn-gold mt8" type="button" onClick={() => onOpenCategoryModal("create")}>
-                  + Créer une catégorie
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <div className="tbl-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Nom</th>
-                    <th>Slug</th>
-                    <th>Articles</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categoryRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        <strong>{row.name}</strong>
-                      </td>
-                      <td className="fs12 fc-3 mono">{row.slug}</td>
-                      <td>{fmtNum(row.itemCount)}</td>
-                      <td>
-                        {canManageCategories ? (
-                          <div className="row-actions">
-                            <button
-                              className="btn btn-outline btn-xs"
-                              type="button"
-                              onClick={() => onOpenCategoryModal("edit", row)}
-                            >
-                              Modifier
-                            </button>{" "}
-                            <button
-                              className="btn btn-danger btn-xs"
-                              type="button"
-                              onClick={() => onRequestDeleteCategory(row)}
-                              disabled={row.itemCount > 0}
-                              title={row.itemCount > 0 ? "Détachez d’abord les articles de cette catégorie" : undefined}
-                            >
-                              Suppr.
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="fs12 fc-3">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {activePage === "categories" ? (
+          <CategoriesAdminPage
+            reloadToken={categoriesReloadToken}
+            canManage={canManageCategories}
+            onNavigate={onNavigate}
+            onOpenCategoryModal={onOpenCategoryModal}
+            onRequestDeleteCategory={onRequestDeleteCategory}
+            onToggleCategoryActive={onToggleCategoryActive}
+          />
+        ) : null}
       </div>
 
       <div id="page-evenements" className={pageClass(activePage, "evenements")}>
@@ -1724,8 +1141,10 @@ export function MainContent({
       <div id="page-utilisateurs" className={pageClass(activePage, "utilisateurs")}>
         <div className="ph">
           <div className="ph-left">
-            <div className="ph-title">Gestion des Utilisateurs</div>
-            <div className="ph-sub">{state.utilisateurs.length} utilisateur(s)</div>
+            <div className="ph-title">Gestion des utilisateurs</div>
+            <div className="ph-sub">
+              {state.utilisateurs.length} utilisateur(s) · 7 profils CDC (un profil principal par compte)
+            </div>
           </div>
           <div className="ph-actions">
             {canManageUsers ? (
@@ -1735,6 +1154,29 @@ export function MainContent({
             ) : null}
           </div>
         </div>
+        <details className="card card-pad mb12 usr-profiles-ref">
+          <summary className="usr-profiles-summary">Liste des profils (référence CDC)</summary>
+          <div className="tbl-wrap" style={{ marginTop: 12 }}>
+            <table className="tbl tbl-compact">
+              <thead>
+                <tr>
+                  <th>Profil</th>
+                  <th>Rôle métier</th>
+                  <th>Droits principaux</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CDC_ROLE_PROFILES.map((p) => (
+                  <tr key={p.role}>
+                    <td className="fw500">{p.profileLabel}</td>
+                    <td>{p.businessRole}</td>
+                    <td className="fs13">{p.mainRights}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
         <div className="card card-overflow-hidden">
           <div className="tbl-wrap">
             <table className="tbl">
@@ -1743,7 +1185,7 @@ export function MainContent({
                   <th>Utilisateur</th>
                   <th>Identifiant</th>
                   <th>Email</th>
-                  <th>Rôle</th>
+                  <th>Profil</th>
                   <th>Dernière action</th>
                   <th>Statut</th>
                   <th />
@@ -1797,6 +1239,16 @@ export function MainContent({
           </div>
         </div>
       </div>
+      {isCdcModulePage(activePage) && activePage !== "dashboard" && activePage !== "alertes" ? (
+        <CdcModulePages
+          activePage={activePage as CdcPageId}
+          evenements={state.evenements}
+          articles={state.articles}
+          onRefreshEvents={onRefreshEvents}
+          onNavigate={(page) => onNavigate(page)}
+        />
+      ) : null}
+
     </main>
   );
 }

@@ -1,7 +1,9 @@
-import { EventLifecycle } from "@prisma/client";
+import { EventLifecycle, OrderStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { notifyRoleGroup } from "@/lib/cdc-notification-dispatch";
+import { validateOrderStatusChange } from "@/lib/cdc-order-rules";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
@@ -18,6 +20,10 @@ const updateEventSchema = z.object({
   endsAt: z.coerce.date().optional(),
   ownerId: objectId.optional(),
   lifecycle: z.nativeEnum(EventLifecycle).optional(),
+  orderStatus: z.nativeEnum(OrderStatus).optional(),
+  teamLeaderId: objectId.optional().nullable(),
+  vehicleId: objectId.optional().nullable(),
+  commercialId: objectId.optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
 });
 
@@ -78,6 +84,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
+    if (payload.orderStatus && payload.orderStatus !== existing.orderStatus) {
+      const check = await validateOrderStatusChange(
+        organizationId,
+        id,
+        payload.orderStatus,
+        existing.orderStatus,
+      );
+      if (!check.ok) {
+        return NextResponse.json({ message: check.message }, { status: 409 });
+      }
+    }
+
     const updated = await prisma.event.update({
       where: { id },
       data: {
@@ -88,9 +106,42 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         endsAt,
         ownerId: payload.ownerId ?? existing.ownerId,
         lifecycle: payload.lifecycle ?? existing.lifecycle,
+        orderStatus: payload.orderStatus ?? existing.orderStatus,
+        teamLeaderId: payload.teamLeaderId === undefined ? existing.teamLeaderId : payload.teamLeaderId,
+        vehicleId: payload.vehicleId === undefined ? existing.vehicleId : payload.vehicleId,
+        commercialId: payload.commercialId === undefined ? existing.commercialId : payload.commercialId,
         notes: payload.notes === undefined ? existing.notes : payload.notes,
       },
+      include: {
+        teamLeader: { select: { fullName: true } },
+        vehicle: { select: { label: true } },
+      },
     });
+
+    if (
+      payload.teamLeaderId !== undefined &&
+      payload.teamLeaderId !== existing.teamLeaderId &&
+      payload.teamLeaderId
+    ) {
+      await notifyRoleGroup(prisma, organizationId, ["TECHNICAL_MANAGER", "STOREKEEPER"], {
+        module: "commandes",
+        title: "Chef d'équipe désigné",
+        body: `${updated.name} — ${updated.teamLeader?.fullName ?? "Affectation"}`,
+        targetType: "Event",
+        targetId: id,
+        severity: "INFO",
+      });
+    }
+    if (payload.vehicleId !== undefined && payload.vehicleId !== existing.vehicleId && payload.vehicleId) {
+      await notifyRoleGroup(prisma, organizationId, ["FLEET_MANAGER", "STOREKEEPER"], {
+        module: "commandes",
+        title: "Véhicule affecté",
+        body: `${updated.name} — ${updated.vehicle?.label ?? "Véhicule"}`,
+        targetType: "Event",
+        targetId: id,
+        severity: "INFO",
+      });
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

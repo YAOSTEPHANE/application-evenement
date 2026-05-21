@@ -1,0 +1,19 @@
+import { NextResponse } from "next/server";
+
+import {
+  CDC_BE_MANDATORY_FIELDS,
+  CDC_BE_PROCESSING_STEPS,
+  CDC_BE_SUBTYPES,
+  CDC_BE_SUMMARY,
+  CDC_BE_TITLE,
+} from "@/lib/cdc-be-document";
+
+export async function GET() {
+  return NextResponse.json({
+    title: CDC_BE_TITLE,
+    summary: CDC_BE_SUMMARY,
+    subtypes: CDC_BE_SUBTYPES,
+    mandatoryFields: CDC_BE_MANDATORY_FIELDS,
+    processingSteps: CDC_BE_PROCESSING_STEPS,
+  });
+}

@@ -1,7 +1,9 @@
-import { EventLifecycle } from "@prisma/client";
+import { EventLifecycle, OrderStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { canCreateCommercialOrder } from "@/lib/cdc-validation-matrix";
+import { notifyRoleGroup } from "@/lib/cdc-notification-dispatch";
 import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
@@ -15,6 +17,9 @@ const createEventSchema = z.object({
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
   ownerId: objectId,
+  commercialId: objectId.optional(),
+  teamLeaderId: objectId.optional(),
+  vehicleId: objectId.optional(),
   lifecycle: z.nativeEnum(EventLifecycle).optional(),
   notes: z.string().max(2000).optional(),
   allocations: z
@@ -54,7 +59,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const payload = createEventSchema.parse(body);
-    const { organizationId } = await getRequestContext();
+    const { organizationId, role, actorId } = await getRequestContext();
+    if (role && !canCreateCommercialOrder(role)) {
+      return NextResponse.json({ message: "Droits insuffisants pour créer une commande" }, { status: 403 });
+    }
 
     if (payload.endsAt <= payload.startsAt) {
       return NextResponse.json(
@@ -126,6 +134,10 @@ export async function POST(request: Request) {
           startsAt: payload.startsAt,
           endsAt: payload.endsAt,
           ownerId: payload.ownerId,
+          commercialId: payload.commercialId ?? actorId ?? payload.ownerId,
+          teamLeaderId: payload.teamLeaderId,
+          vehicleId: payload.vehicleId,
+          orderStatus: OrderStatus.PENDING,
           lifecycle: payload.lifecycle ?? EventLifecycle.PLANNED,
           notes: payload.notes,
           organizationId,
@@ -149,6 +161,15 @@ export async function POST(request: Request) {
           },
         });
       }
+
+      await notifyRoleGroup(tx, organizationId, ["STOREKEEPER", "TECHNICAL_MANAGER", "FLEET_MANAGER"], {
+        module: "commandes",
+        title: "Nouvelle commande événement",
+        body: `${created.name} — ${payload.clientName} · traitement requis`,
+        targetType: "Event",
+        targetId: created.id,
+        severity: "INFO",
+      });
 
       return created;
     });

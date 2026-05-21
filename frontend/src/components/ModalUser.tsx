@@ -1,5 +1,9 @@
 "use client";
 
+import { ModalRoot } from "@/components/ModalRoot";
+import { ModalHeader } from "@/components/ModalHeader";
+import { UI_ROLE_PROFILE_OPTIONS } from "@/lib/cdc-role-profiles";
+
 type ModalUserProps = {
   isOpen: boolean;
   mode: "create" | "edit";
@@ -9,107 +13,96 @@ type ModalUserProps = {
 
 export function ModalUser({ isOpen, mode, onClose, onSave }: ModalUserProps) {
   const isEdit = mode === "edit";
-  const title = isEdit ? "Modifier l’utilisateur" : "Ajouter un utilisateur";
+  const title = isEdit ? "Modifier l'utilisateur" : "Ajouter un utilisateur";
   const saveLabel = isEdit ? "Enregistrer" : "Ajouter";
 
   return (
-    <div className={`modal-bg${isOpen ? " open" : ""}`} id="modalUser">
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modalUserTitle">
-        <div className="modal-hd">
-          <h2 id="modalUserTitle">{title}</h2>
-          <button className="modal-close" type="button" onClick={onClose}>
-            ✕
-          </button>
-        </div>
+    <ModalRoot isOpen={isOpen} id="modalUser">
+      <div className="modal modal--form" role="dialog" aria-modal="true" aria-labelledby="modalUserTitle">
+        <ModalHeader
+          icon="users"
+          title={title}
+          subtitle="Compte, rôle et accès application"
+          onClose={onClose}
+          titleId="modalUserTitle"
+        />
 
-        <div className="form-grid">
-          <input type="hidden" id="usr-id" />
-          <div className="fg full">
-            <label htmlFor="usr-username">Nom d’utilisateur *</label>
-            <input
-              className="fi"
-              id="usr-username"
-              placeholder="lettres, chiffres, . _ -"
-              autoComplete="off"
-              aria-label="Nom d’utilisateur"
-            />
-          </div>
-          <div className="fg">
-            <label htmlFor="usr-prenom">Prénom *</label>
-            <input className="fi" id="usr-prenom" placeholder="Prénom" aria-label="Prénom" />
-          </div>
-          <div className="fg">
-            <label htmlFor="usr-nom">Nom *</label>
-            <input className="fi" id="usr-nom" placeholder="Nom" aria-label="Nom" />
-          </div>
-          <div className="fg full">
-            <label htmlFor="usr-email">Email *</label>
-            <input
-              className="fi"
-              id="usr-email"
-              type="email"
-              placeholder="email@agence.ci"
-              aria-label="Email"
-            />
-          </div>
-          <div className="fg full">
-            <label htmlFor="usr-role">Rôle *</label>
-            <select className="fs" id="usr-role" defaultValue="Administrateur" aria-label="Rôle">
-              <option value="Administrateur">Administrateur</option>
-              <option value="Gestionnaire">Gestionnaire</option>
-              <option value="Magasinier">Magasinier</option>
-              <option value="Lecture seule">Lecture seule</option>
-            </select>
-          </div>
+        <div className="modal-body">
+          <div className="form-grid form-premium">
+            <input type="hidden" id="usr-id" />
+            <div className="fg full">
+              <label htmlFor="usr-username">Nom d&apos;utilisateur *</label>
+              <input
+                className="fi"
+                id="usr-username"
+                placeholder="lettres, chiffres, . _ -"
+                autoComplete="off"
+              />
+            </div>
+            <div className="fg">
+              <label htmlFor="usr-prenom">Prénom *</label>
+              <input className="fi" id="usr-prenom" placeholder="Prénom" />
+            </div>
+            <div className="fg">
+              <label htmlFor="usr-nom">Nom *</label>
+              <input className="fi" id="usr-nom" placeholder="Nom" />
+            </div>
+            <div className="fg full">
+              <label htmlFor="usr-email">Email *</label>
+              <input
+                className="fi"
+                id="usr-email"
+                type="email"
+                placeholder="email@agence.ci"
+              />
+            </div>
+            <div className="fg full">
+              <label htmlFor="usr-role">Profil principal *</label>
+              <select className="fs" id="usr-role" defaultValue="Administrateur">
+                {UI_ROLE_PROFILE_OPTIONS.map((label) => (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <p className="form-hint" style={{ marginTop: 6 }}>
+                Un seul profil par utilisateur — voir la liste des profils dans Validation → Droits.
+              </p>
+            </div>
 
-          {!isEdit ? (
-            <>
+            {!isEdit ? (
+              <>
+                <div className="fg full">
+                  <label htmlFor="usr-password">Mot de passe * (min. 8 caractères)</label>
+                  <input
+                    className="fi"
+                    id="usr-password"
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="fg full">
+                  <label htmlFor="usr-password2">Confirmer le mot de passe *</label>
+                  <input
+                    className="fi"
+                    id="usr-password2"
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </>
+            ) : (
               <div className="fg full">
-                <label htmlFor="usr-password">Mot de passe * (min. 8 caractères)</label>
+                <label htmlFor="usr-password-edit">Nouveau mot de passe (laisser vide pour ne pas changer)</label>
                 <input
                   className="fi"
-                  id="usr-password"
+                  id="usr-password-edit"
                   type="password"
                   autoComplete="new-password"
-                  aria-label="Mot de passe"
                 />
               </div>
-              <div className="fg full">
-                <label htmlFor="usr-password-confirm">Confirmer le mot de passe *</label>
-                <input
-                  className="fi"
-                  id="usr-password-confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  aria-label="Confirmer le mot de passe"
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="fg full">
-                <label htmlFor="usr-new-password">Nouveau mot de passe (optionnel)</label>
-                <input
-                  className="fi"
-                  id="usr-new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="Laisser vide pour ne pas changer"
-                  aria-label="Nouveau mot de passe"
-                />
-              </div>
-              <div className="fg full">
-                <label htmlFor="usr-new-password-confirm">Confirmer le nouveau mot de passe</label>
-                <input
-                  className="fi"
-                  id="usr-new-password-confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  aria-label="Confirmer le nouveau mot de passe"
-                />
-              </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="modal-ft">
@@ -121,6 +114,6 @@ export function ModalUser({ isOpen, mode, onClose, onSave }: ModalUserProps) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalRoot>
   );
 }

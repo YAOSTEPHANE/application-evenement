@@ -1,0 +1,16 @@
+          <div className="form-grid">
+            <div className="fg full">
+              <label>Type de mouvement</label>
+              <select
+                className="fs"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as MovementUiType)}
+              >
+                {CATEGORY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <motionlessModal />

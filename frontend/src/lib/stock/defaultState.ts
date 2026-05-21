@@ -1,4 +1,4 @@
-import type { StockState } from "./types";
+import { emptyArticleFields, type StockState } from "./types";
 
 export const STORE_KEY = "stockevent_pro_v1";
 
@@ -76,6 +76,7 @@ export function defaultState(): StockState {
         seuilMin: 2,
         emoji: "🛋",
         notes: "En réparation: 1 unité",
+        condition: "À réparer" as const,
       },
       {
         id: "a7",
@@ -101,7 +102,13 @@ export function defaultState(): StockState {
         emoji: "🪵",
         notes: "Pliante aluminium",
       },
-    ],
+    ].map((row) => {
+      const base = { ...emptyArticleFields(), ...row };
+      return {
+        ...base,
+        stockLevels: { ...base.stockLevels, min: row.seuilMin },
+      };
+    }),
     evenements: [
       {
         id: "e1",
@@ -158,6 +165,10 @@ export function defaultState(): StockState {
         type: "Retour",
         articleId: "a1",
         qty: 50,
+        signedQty: 50,
+        reason: "Retour",
+        fromLabel: "Chantier",
+        toLabel: "Entrepôt",
         evId: "e1",
         operateur: "Sarah L.",
         etat: "Bon état",
@@ -169,6 +180,10 @@ export function defaultState(): StockState {
         type: "Sortie",
         articleId: "a2",
         qty: 8,
+        signedQty: 8,
+        reason: "Sortie",
+        fromLabel: "Entrepôt",
+        toLabel: "Chantier",
         evId: "e1",
         operateur: "Kofi M.",
         etat: "",
@@ -180,6 +195,10 @@ export function defaultState(): StockState {
         type: "Retour",
         articleId: "a4",
         qty: 30,
+        signedQty: 30,
+        reason: "Retour",
+        fromLabel: "Chantier",
+        toLabel: "Entrepôt",
         evId: "e2",
         operateur: "Kofi M.",
         etat: "Endommagé",
@@ -191,6 +210,10 @@ export function defaultState(): StockState {
         type: "Sortie",
         articleId: "a3",
         qty: 15,
+        signedQty: 15,
+        reason: "Sortie",
+        fromLabel: "Entrepôt",
+        toLabel: "Chantier",
         evId: "e2",
         operateur: "Sarah L.",
         etat: "",
@@ -202,6 +225,10 @@ export function defaultState(): StockState {
         type: "Réception",
         articleId: "a5",
         qty: 10,
+        signedQty: 10,
+        reason: "Réception",
+        fromLabel: "Fournisseur",
+        toLabel: "Entrepôt",
         evId: "",
         operateur: "Aminata D.",
         etat: "",
@@ -213,6 +240,10 @@ export function defaultState(): StockState {
         type: "Perte",
         articleId: "a3",
         qty: 3,
+        signedQty: 3,
+        reason: "Perte",
+        fromLabel: "Chantier",
+        toLabel: "—",
         evId: "",
         operateur: "Kofi M.",
         etat: "Perdu",
@@ -234,7 +265,7 @@ export function defaultState(): StockState {
         prenom: "Kofi",
         nom: "Mensah",
         email: "kofi@eventagence.ci",
-        role: "Gestionnaire",
+        role: "Commercial",
         actif: true,
       },
       {
@@ -242,7 +273,7 @@ export function defaultState(): StockState {
         prenom: "Sarah",
         nom: "Lozano",
         email: "sarah@eventagence.ci",
-        role: "Magasinier",
+        role: "Gestionnaire de stock",
         actif: true,
       },
       {
@@ -250,7 +281,7 @@ export function defaultState(): StockState {
         prenom: "Marc",
         nom: "Touré",
         email: "marc@eventagence.ci",
-        role: "Lecture seule",
+        role: "Utilisateur lambda",
         actif: false,
       },
     ],

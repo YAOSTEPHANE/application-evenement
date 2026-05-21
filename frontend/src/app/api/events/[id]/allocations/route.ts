@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { applyStockDelta, loadStockQuantities } from "@/lib/item-variant-helpers";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
@@ -11,6 +12,7 @@ const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId in
 
 const allocationSchema = z.object({
   itemId: objectId,
+  itemVariantId: objectId.optional(),
   quantity: z.number().int().positive(),
 });
 
@@ -34,8 +36,35 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ message: "Événement introuvable" }, { status: 404 });
     }
 
-    const existingQty =
-      event.eventItems.find((row) => row.itemId === payload.itemId)?.quantity ?? 0;
+    const item = await prisma.item.findFirst({
+      where: { id: payload.itemId, organizationId },
+    });
+
+    if (!item) {
+      return NextResponse.json({ message: "Article introuvable" }, { status: 404 });
+    }
+
+    if (item.hasVariants && !payload.itemVariantId) {
+      return NextResponse.json(
+        { message: "Sélectionnez une variante pour cet article." },
+        { status: 400 },
+      );
+    }
+
+    if (payload.itemVariantId) {
+      const variant = await prisma.itemVariant.findFirst({
+        where: { id: payload.itemVariantId, itemId: payload.itemId, organizationId },
+      });
+      if (!variant) {
+        return NextResponse.json({ message: "Variante introuvable" }, { status: 404 });
+      }
+    }
+
+    const matchAllocation = (row: { itemId: string; itemVariantId: string | null }) =>
+      row.itemId === payload.itemId &&
+      (row.itemVariantId ?? null) === (payload.itemVariantId ?? null);
+
+    const existingQty = event.eventItems.find(matchAllocation)?.quantity ?? 0;
 
     const overlappingEvents = await prisma.event.findMany({
       where: {
@@ -50,21 +79,24 @@ export async function POST(request: Request, { params }: RouteParams) {
     let pendingOnOverlaps = 0;
     for (const other of overlappingEvents) {
       for (const allocation of other.eventItems) {
-        if (allocation.itemId === payload.itemId) {
+        if (matchAllocation(allocation)) {
           pendingOnOverlaps += allocation.quantity;
         }
       }
     }
 
-    const item = await prisma.item.findFirst({
-      where: { id: payload.itemId, organizationId },
-    });
+    const stock = await loadStockQuantities(
+      prisma,
+      organizationId,
+      payload.itemId,
+      payload.itemVariantId,
+    );
 
-    if (!item) {
-      return NextResponse.json({ message: "Article introuvable" }, { status: 404 });
+    if (!stock) {
+      return NextResponse.json({ message: "Stock introuvable" }, { status: 404 });
     }
 
-    const remaining = item.availableQty - pendingOnOverlaps;
+    const remaining = stock.availableQty - pendingOnOverlaps;
     if (payload.quantity > remaining + existingQty) {
       return NextResponse.json(
         {
@@ -77,9 +109,11 @@ export async function POST(request: Request, { params }: RouteParams) {
     const delta = payload.quantity - existingQty;
 
     const eventItem = await prisma.$transaction(async (tx) => {
-      if (existingQty > 0) {
-        await tx.eventItem.updateMany({
-          where: { eventId, itemId: payload.itemId },
+      const existingRow = event.eventItems.find(matchAllocation);
+
+      if (existingRow) {
+        await tx.eventItem.update({
+          where: { id: existingRow.id },
           data: { quantity: payload.quantity },
         });
       } else {
@@ -87,23 +121,25 @@ export async function POST(request: Request, { params }: RouteParams) {
           data: {
             eventId,
             itemId: payload.itemId,
+            itemVariantId: payload.itemVariantId ?? null,
             quantity: payload.quantity,
           },
         });
       }
 
       if (delta !== 0) {
-        await tx.item.update({
-          where: { id: payload.itemId },
-          data: {
-            availableQty: { decrement: delta },
-            allocatedQty: { increment: delta },
-          },
+        await applyStockDelta(tx, organizationId, payload.itemId, payload.itemVariantId, {
+          available: -delta,
+          allocated: delta,
         });
       }
 
       return tx.eventItem.findFirst({
-        where: { eventId, itemId: payload.itemId },
+        where: {
+          eventId,
+          itemId: payload.itemId,
+          itemVariantId: payload.itemVariantId ?? null,
+        },
       });
     });
 

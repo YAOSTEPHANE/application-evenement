@@ -10,7 +10,7 @@ import {
   type SeriesPoint,
 } from "@/components/AnalyticsCharts";
 import type { AuditLogsResponse, DashboardResponse } from "@/lib/stock/api";
-import { dispo, fmt, fmtNum, fmtTime } from "@/lib/stock/helpers";
+import { dispo, fmt, fmtNum, fmtTime, isArticleStockAlert } from "@/lib/stock/helpers";
 import type { Article, Evenement, StockState } from "@/lib/stock/types";
 
 import type { PageId } from "./Sidebar";
@@ -141,7 +141,7 @@ export function AnalyticsRapports({
   const itemCount = m?.items ?? state.articles.length;
   const activeEv = m?.activeEvents ?? state.evenements.filter((e) => e.statut !== "Terminé" && e.statut !== "Annulé").length;
   const movementsTotal = m?.movements ?? state.mouvements.length;
-  const alertsN = m?.alerts ?? state.articles.filter((a) => dispo(a) <= a.seuilMin).length;
+  const alertsN = m?.alerts ?? state.articles.filter((a) => isArticleStockAlert(a)).length;
   const allocPct = m?.allocationRatePct ?? localAllocationRate(state);
   const valeur = m?.stockValueEstimate != null && m.stockValueEstimate > 0 ? m.stockValueEstimate : stockValue;
 
@@ -151,12 +151,7 @@ export function AnalyticsRapports({
         <div className="an-hero-grid" aria-hidden />
         <div className="an-hero-inner">
           <div className="an-hero-copy">
-            <p className="an-eyebrow">Insights &amp; performance</p>
             <h1 className="an-hero-title">Centre analytique</h1>
-            <p className="an-hero-desc">
-              Vue consolidée des flux, du stock et de l&apos;activité opérationnelle — données synchronisées avec votre
-              organisation.
-            </p>
             <div className="an-hero-tags">
               <span className="an-tag">14 jours</span>
               <span className="an-tag">Temps réel</span>

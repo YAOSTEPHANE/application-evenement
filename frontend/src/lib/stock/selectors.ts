@@ -1,4 +1,4 @@
-import { dispo, initials } from "./helpers";
+import { dispo, initials, isArticleStockAlert } from "./helpers";
 import type { Article, Evenement, StockState, Utilisateur } from "./types";
 
 export function getArticle(state: StockState, id: string): Article | undefined {
@@ -42,7 +42,7 @@ export function counts(state: StockState) {
     (event) => event.statut !== "Terminé" && event.statut !== "Annulé",
   ).length;
 
-  const alertes = state.articles.filter((article) => dispo(article) <= article.seuilMin).length;
+  const alertes = state.articles.filter((article) => isArticleStockAlert(article)).length;
 
   return {
     catalogue: state.articles.length,

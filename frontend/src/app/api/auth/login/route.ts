@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
-import { createSessionToken, SESSION_COOKIE_NAME } from "@/lib/session-token";
+import { createPending2FaToken, PENDING_2FA_COOKIE } from "@/lib/pending-2fa-token";
+import { createSessionToken, SESSION_COOKIE_NAME, sessionMaxAgeSeconds } from "@/lib/session-token";
+import { roleMustUse2Fa } from "@/lib/totp-auth";
 
 const loginSchema = z.object({
   identifier: z.string().min(1, "Identifiant requis"),
@@ -47,8 +49,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Ce compte est désactivé. Contactez un administrateur." }, { status: 403 });
     }
 
-    const token = await createSessionToken(user.id, user.organizationId, user.role);
+    if (roleMustUse2Fa(user.role, user.twoFactorEnabled)) {
+      if (!user.totpSecret) {
+        return NextResponse.json(
+          {
+            message:
+              "La double authentification est obligatoire pour votre profil. Configurez-la depuis Profil → Sécurité 2FA.",
+            needsTwoFactorSetup: true,
+          },
+          { status: 403 },
+        );
+      }
+      const pending = await createPending2FaToken(user.id);
+      const res = NextResponse.json({
+        needsTwoFactor: true,
+        pendingToken: pending,
+        user: {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+        },
+      });
+      res.cookies.set(PENDING_2FA_COOKIE, pending, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 300,
+      });
+      return res;
+    }
+
+    const token = await createSessionToken(user.id, user.organizationId, user.role, true);
     const res = NextResponse.json({
+      sessionToken: token,
       user: {
         id: user.id,
         fullName: user.fullName,
@@ -64,7 +98,7 @@ export async function POST(request: Request) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: sessionMaxAgeSeconds(),
     });
 
     return res;

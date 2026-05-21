@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
+  // Monorepo : un seul node_modules à la racine ; évite l’avertissement multi-lockfile Turbopack.
+  turbopack: {
+    root: path.join(__dirname, ".."),
+  },
   // Les navigateurs demandent /favicon.ico par défaut. Une redirection 302 peut encore apparaître en « 404 »
   // selon l’outil réseau ; une réécriture interne renvoie le SVG avec un 200 sur /favicon.ico.
   async rewrites() {

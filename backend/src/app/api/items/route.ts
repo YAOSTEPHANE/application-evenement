@@ -1,57 +1,87 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  ITEM_PUBLIC_SELECT,
+  itemCreateSchema,
+  normalizeItemPayload,
+  serializeItemRow,
+} from "@/lib/item-helpers";
+import {
+  upsertItemVariants,
+  VARIANT_PUBLIC_SELECT,
+  serializeVariantRow,
+  variantWriteSchema,
+} from "@/lib/item-variant-helpers";
 import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
 import { getRequestContext } from "@/lib/request-context";
 
 const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
-const createItemSchema = z.object({
-  name: z.string().min(2),
-  reference: z.string().min(2),
-  categoryId: objectId,
-  unitValue: z.number().nonnegative(),
-  totalQuantity: z.number().int().positive(),
-  minThreshold: z.number().int().nonnegative().default(0),
-  photoUrl: z.string().url().optional(),
-  emoji: z.string().max(8).optional(),
-  notes: z.string().max(2000).optional(),
-});
+const createItemSchema = itemCreateSchema
+  .extend({
+    categoryId: objectId,
+    totalQuantity: z.number().int().nonnegative(),
+    hasVariants: z.boolean().optional(),
+    variants: z.array(variantWriteSchema).max(50).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.hasVariants) {
+      if (!data.variants?.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Ajoutez au moins une variante.",
+          path: ["variants"],
+        });
+      }
+    } else {
+      if (data.variants?.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Les variantes ne sont autorisées que si le produit est multi-variantes.",
+          path: ["variants"],
+        });
+      }
+      if (data.totalQuantity < 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "La quantité totale doit être positive.",
+          path: ["totalQuantity"],
+        });
+      }
+    }
+  });
+
+type ItemRowInput = Parameters<typeof serializeItemRow>[0];
+type RawVariantInput = Parameters<typeof serializeVariantRow>[0];
+
+function serializeItemWithVariants(
+  item: Omit<ItemRowInput, "variants"> & { variants?: RawVariantInput[] },
+) {
+  const { variants, ...rest } = item;
+  return serializeItemRow({
+    ...rest,
+    variants: (variants ?? []).map(serializeVariantRow),
+  });
+}
 
 export async function GET() {
   const { organizationId } = await getRequestContext();
 
   const items = await prisma.item.findMany({
     where: { organizationId },
-    // On évite de résoudre la relation `category` car certaines données peuvent être incohérentes
-    // (Prisma: "Inconsistent query result: Field category is required... got null").
-    // Le frontend récupère ensuite le nom via GET /api/categories + categoryId.
     select: {
-      id: true,
-      name: true,
-      reference: true,
-      photoUrl: true,
-      emoji: true,
-      notes: true,
-      unitValue: true,
-      totalQuantity: true,
-      availableQty: true,
-      allocatedQty: true,
-      minThreshold: true,
-      categoryId: true,
-      createdAt: true,
-      updatedAt: true,
+      ...ITEM_PUBLIC_SELECT,
+      variants: {
+        select: VARIANT_PUBLIC_SELECT,
+        orderBy: [{ sortOrder: "asc" }, { reference: "asc" }],
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(
-    items.map((item) => ({
-      ...item,
-      isCritical: item.availableQty <= item.minThreshold,
-    }))
-  );
+  return NextResponse.json(items.map(serializeItemWithVariants));
 }
 
 export async function POST(request: Request) {
@@ -60,36 +90,63 @@ export async function POST(request: Request) {
     const payload = createItemSchema.parse(body);
     const { organizationId } = await getRequestContext();
 
-    const item = await prisma.item.create({
-      data: {
-        name: payload.name,
-        reference: payload.reference,
-        categoryId: payload.categoryId,
-        photoUrl: payload.photoUrl,
-        emoji: payload.emoji ?? "📦",
-        notes: payload.notes,
-        unitValue: payload.unitValue,
-        totalQuantity: payload.totalQuantity,
-        availableQty: payload.totalQuantity,
-        allocatedQty: 0,
-        repairQty: 0,
-        minThreshold: payload.minThreshold,
-        organizationId,
-      },
+    const category = await prisma.category.findFirst({
+      where: { id: payload.categoryId, organizationId },
+      select: { id: true },
+    });
+    if (!category) {
+      return NextResponse.json({ message: "Catégorie introuvable" }, { status: 400 });
+    }
+
+    const hasVariants = Boolean(payload.hasVariants && payload.variants?.length);
+    const data = normalizeItemPayload(payload);
+
+    const item = await prisma.$transaction(async (tx) => {
+      const created = await tx.item.create({
+        data: {
+          ...data,
+          hasVariants,
+          totalQuantity: hasVariants ? 0 : payload.totalQuantity,
+          availableQty: hasVariants ? 0 : payload.totalQuantity,
+          allocatedQty: 0,
+          repairQty: 0,
+          organizationId,
+        },
+        select: { ...ITEM_PUBLIC_SELECT, variants: { select: VARIANT_PUBLIC_SELECT } },
+      });
+
+      if (hasVariants && payload.variants) {
+        await upsertItemVariants(tx, organizationId, created.id, payload.variants);
+      }
+
+      return tx.item.findFirst({
+        where: { id: created.id },
+        select: {
+          ...ITEM_PUBLIC_SELECT,
+          variants: {
+            select: VARIANT_PUBLIC_SELECT,
+            orderBy: [{ sortOrder: "asc" }, { reference: "asc" }],
+          },
+        },
+      });
     });
 
-    return NextResponse.json(item, { status: 201 });
+    if (!item) {
+      return NextResponse.json({ message: "Impossible de créer l'article" }, { status: 500 });
+    }
+
+    return NextResponse.json(serializeItemWithVariants(item), { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Payload invalide", errors: error.flatten() },
-        { status: 400 }
+        { status: 400 },
       );
     }
+    if (error instanceof Error && error.message.includes("variante")) {
+      return NextResponse.json({ message: error.message }, { status: 409 });
+    }
 
-    return NextResponse.json(
-      { message: "Impossible de créer l'article" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Impossible de créer l'article" }, { status: 500 });
   }
 }

@@ -4,23 +4,26 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-export type PageId =
-  | "dashboard"
+import { NavIcon, type AppIconName } from "@/components/icons/AppIcon";
+import { CDC_MODULE_NAV, type CdcModulePageId } from "@/lib/cdc-modules";
+
+/** Pages hors menu modules (profil, pages legacy encore montées dans MainContent). */
+export type LegacyPageId =
   | "catalogue"
   | "categories"
+  | "entrepots"
+  | "stock-localisation"
   | "evenements"
   | "mouvements"
   | "rapports"
-  | "alertes"
   | "scan"
-  | "utilisateurs"
-  | "profil";
+  | "utilisateurs";
+
+export type PageId = CdcModulePageId | LegacyPageId | "profil";
 
 type SidebarProps = {
   activePage: PageId;
   onNavigate: (page: PageId) => void;
-  catalogueCount?: number;
-  evenementsCount?: number;
   alertesCount?: number;
   userInitials?: string;
   userFullName?: string;
@@ -28,11 +31,33 @@ type SidebarProps = {
   userRoleLabel?: string;
 };
 
+type NavEntry = {
+  page: PageId;
+  icon: AppIconName;
+  label: string;
+  badgeId?: string;
+  badgeDanger?: boolean;
+};
+
+const MODULE_NAV: NavEntry[] = CDC_MODULE_NAV.map((entry) => ({
+  page: entry.page,
+  icon: entry.icon,
+  label: entry.label,
+  badgeId: entry.badgeId,
+  badgeDanger: entry.badgeDanger,
+}));
+
+const MOBILE_PRIMARY_PAGES: CdcModulePageId[] = [
+  "dashboard",
+  "commandes",
+  "bons",
+  "rfid",
+  "alertes",
+];
+
 export function Sidebar({
   activePage,
   onNavigate,
-  catalogueCount = 0,
-  evenementsCount = 0,
   alertesCount = 0,
   userInitials = "AD",
   userFullName = "Aminata Diallo",
@@ -41,19 +66,17 @@ export function Sidebar({
 }: SidebarProps) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [mobileMoreClosing, setMobileMoreClosing] = useState(false);
-  const itemClass = (page: PageId) =>
-    `nav-item${activePage === page ? " active" : ""}`;
-  const mobileItemClass = (page: PageId) =>
-    `mobile-nav-item${activePage === page ? " active" : ""}`;
+  const itemClass = (page: PageId) => `nav-item${activePage === page ? " active" : ""}`;
+  const mobileItemClass = (page: PageId) => `mobile-nav-item${activePage === page ? " active" : ""}`;
+
+  const mobileMorePages = useMemo(
+    () => MODULE_NAV.filter((e) => !MOBILE_PRIMARY_PAGES.includes(e.page as CdcModulePageId)),
+    [],
+  );
 
   const isSecondaryActive = useMemo(
-    () =>
-      activePage === "mouvements" ||
-      activePage === "rapports" ||
-      activePage === "categories" ||
-      activePage === "utilisateurs" ||
-      activePage === "profil",
-    [activePage],
+    () => mobileMorePages.some((e) => e.page === activePage) || activePage === "profil",
+    [activePage, mobileMorePages],
   );
 
   const closeMobileMore = useCallback(() => {
@@ -98,93 +121,44 @@ export function Sidebar({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closeMobileMore, mobileMoreOpen]);
 
+  const badgeCount = (id?: string) => {
+    if (id === "nb-alertes") return alertesCount;
+    return 0;
+  };
+
+  const renderNavGroup = (entries: NavEntry[]) =>
+    entries.map((entry) => {
+      const count = badgeCount(entry.badgeId);
+      return (
+        <div
+          key={entry.page}
+          className={itemClass(entry.page)}
+          onClick={() => goTo(entry.page)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") goTo(entry.page);
+          }}
+        >
+          <NavIcon name={entry.icon} />
+          <span className="nav-label">{entry.label}</span>
+          {entry.badgeId && count > 0 ? (
+            <span className={`nav-badge${entry.badgeDanger ? " danger" : ""}`} id={entry.badgeId}>
+              {count}
+            </span>
+          ) : null}
+        </div>
+      );
+    });
+
   return (
     <aside id="sidebar">
       <div className="sidebar-desktop-content">
-        <div className="nav-section">Principal</div>
-
-        <div className={itemClass("dashboard")} onClick={() => goTo("dashboard")}>
-          <span className="nav-icon" aria-hidden="true">
-            ⊞
-          </span>
-          Tableau de bord
+        <div className="nav-section nav-section-cdc">
+          <span className="nav-section-dot" aria-hidden />
+          EVENT · RFID
         </div>
-
-        <div className={itemClass("catalogue")} onClick={() => goTo("catalogue")}>
-          <span className="nav-icon" aria-hidden="true">
-            ◉
-          </span>
-          Catalogue
-          <span className="nav-badge" id="nb-catalogue">
-            {catalogueCount}
-          </span>
-        </div>
-
-        <div className={itemClass("categories")} onClick={() => goTo("categories")}>
-          <span className="nav-icon" aria-hidden="true">
-            ▤
-          </span>
-          Catégories
-        </div>
-
-        <div className={itemClass("evenements")} onClick={() => goTo("evenements")}>
-          <span className="nav-icon" aria-hidden="true">
-            ◈
-          </span>
-          Événements
-          <span className="nav-badge" id="nb-evenements">
-            {evenementsCount}
-          </span>
-        </div>
-
-        <div className={itemClass("mouvements")} onClick={() => goTo("mouvements")}>
-          <span className="nav-icon" aria-hidden="true">
-            ⇄
-          </span>
-          Mouvements
-        </div>
-
-        <div className="nav-section">Analyse</div>
-
-        <div className={itemClass("rapports")} onClick={() => goTo("rapports")}>
-          <span className="nav-icon" aria-hidden="true">
-            ▦
-          </span>
-          Analytique
-        </div>
-
-        <div className={itemClass("alertes")} onClick={() => goTo("alertes")}>
-          <span className="nav-icon" aria-hidden="true">
-            ◬
-          </span>
-          Alertes
-          <span className="nav-badge danger" id="nb-alertes">
-            {alertesCount}
-          </span>
-        </div>
-
-        <div className="nav-section">Outils</div>
-
-        <div className={itemClass("scan")} onClick={() => goTo("scan")}>
-          <span className="nav-icon" aria-hidden="true">
-            ⊙
-          </span>
-          Scan / Sortie rapide
-        </div>
-
-        <div className={itemClass("utilisateurs")} onClick={() => goTo("utilisateurs")}>
-          <span className="nav-icon" aria-hidden="true">
-            ◎
-          </span>
-          Utilisateurs
-        </div>
-
-        <div className={itemClass("profil")} onClick={() => goTo("profil")}>
-          <span className="nav-icon" aria-hidden="true">
-            ☺
-          </span>
-          Mon profil
-        </div>
+        {renderNavGroup(MODULE_NAV)}
 
         <Link
           href="/deconnexion"
@@ -195,10 +169,8 @@ export function Sidebar({
             setMobileMoreClosing(false);
           }}
         >
-          <span className="nav-icon" aria-hidden="true">
-            ⎋
-          </span>
-          Déconnexion
+          <NavIcon name="logout" />
+          <span className="nav-label">Déconnexion</span>
         </Link>
 
         <div className="sidebar-foot">
@@ -229,33 +201,28 @@ export function Sidebar({
       </div>
 
       <div className="mobile-nav">
-        <button type="button" className={mobileItemClass("dashboard")} onClick={() => goTo("dashboard")}>
-          <span className="nav-icon" aria-hidden="true">⊞</span>
-          <span>Accueil</span>
-        </button>
-        <button type="button" className={mobileItemClass("catalogue")} onClick={() => goTo("catalogue")}>
-          <span className="nav-icon" aria-hidden="true">◉</span>
-          <span>Stock</span>
-        </button>
-        <button type="button" className={mobileItemClass("evenements")} onClick={() => goTo("evenements")}>
-          <span className="nav-icon" aria-hidden="true">◈</span>
-          <span>Events</span>
-        </button>
-        <button type="button" className={mobileItemClass("alertes")} onClick={() => goTo("alertes")}>
-          <span className="nav-icon" aria-hidden="true">◬</span>
-          <span>Alertes</span>
-        </button>
-        <button type="button" className={`mobile-nav-item${mobileItemClass("scan").includes("active") ? " active" : ""}`} onClick={() => goTo("scan")}>
-          <span className="nav-icon" aria-hidden="true">⊙</span>
-          <span>Scan</span>
-        </button>
+        {MODULE_NAV.filter((e) => MOBILE_PRIMARY_PAGES.includes(e.page as CdcModulePageId)).map(
+          (entry) => (
+            <button
+              key={entry.page}
+              type="button"
+              className={mobileItemClass(entry.page)}
+              onClick={() => goTo(entry.page)}
+            >
+              <NavIcon name={entry.icon} />
+              <span>{entry.label}</span>
+            </button>
+          ),
+        )}
         <button
           type="button"
           className={`mobile-nav-item${mobileMoreOpen || isSecondaryActive ? " active" : ""}`}
           onClick={toggleMobileMore}
           aria-expanded={mobileMoreOpen}
         >
-          <span className="nav-icon" aria-hidden="true">⋯</span>
+          <span className="nav-icon-wrap nav-icon-wrap--more">
+            <span className="nav-more-dots">⋯</span>
+          </span>
           <span>Plus</span>
         </button>
       </div>
@@ -269,33 +236,23 @@ export function Sidebar({
             onClick={closeMobileMore}
           />
           <div className={`mobile-more-panel${mobileMoreClosing ? " is-closing" : ""}`}>
-            <button type="button" className={mobileItemClass("mouvements")} onClick={() => goTo("mouvements")}>
-              <span className="nav-icon" aria-hidden="true">⇄</span>
-              <span>Mouvements</span>
-            </button>
-            <button type="button" className={mobileItemClass("categories")} onClick={() => goTo("categories")}>
-              <span className="nav-icon" aria-hidden="true">▤</span>
-              <span>Catégories</span>
-            </button>
-            <button type="button" className={mobileItemClass("rapports")} onClick={() => goTo("rapports")}>
-              <span className="nav-icon" aria-hidden="true">▦</span>
-              <span>Analytique</span>
-            </button>
-            <button type="button" className={mobileItemClass("utilisateurs")} onClick={() => goTo("utilisateurs")}>
-              <span className="nav-icon" aria-hidden="true">◎</span>
-              <span>Utilisateurs</span>
-            </button>
+            {mobileMorePages.map((entry) => (
+              <button
+                key={entry.page}
+                type="button"
+                className={mobileItemClass(entry.page)}
+                onClick={() => goTo(entry.page)}
+              >
+                <NavIcon name={entry.icon} />
+                <span>{entry.label}</span>
+              </button>
+            ))}
             <button type="button" className={mobileItemClass("profil")} onClick={() => goTo("profil")}>
-              <span className="nav-icon" aria-hidden="true">☺</span>
+              <NavIcon name="profile" />
               <span>Mon profil</span>
             </button>
-            <Link
-              href="/deconnexion"
-              className="mobile-nav-item"
-              prefetch={false}
-              onClick={closeMobileMore}
-            >
-              <span className="nav-icon" aria-hidden="true">⎋</span>
+            <Link href="/deconnexion" className="mobile-nav-item" prefetch={false} onClick={closeMobileMore}>
+              <NavIcon name="logout" />
               <span>Déconnexion</span>
             </Link>
           </div>
@@ -304,4 +261,3 @@ export function Sidebar({
     </aside>
   );
 }
-

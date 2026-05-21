@@ -1,0 +1,81 @@
+---
+description: Cahier des charges EVENT·RFID — lexique, constats, objectifs et règles métier à appliquer au développement (ne pas afficher ces textes dans l'UI utilisateur).
+alwaysApply: true
+---
+
+# CDC EVENT·RFID — référence développement
+
+Ces contenus proviennent du cahier des charges. **Ne pas les afficher** dans le tableau de bord ni comme blocs documentaires dans l'UI : ils guident l'implémentation. Source de vérité code : `frontend/src/lib/cdc-*.ts`.
+
+## Principe directeur (traçabilité)
+
+Aucun article ne quitte un site, n'entre dans un stock ou ne transite entre deux sites sans avoir été préalablement identifié par RFID et documenté par un bon numérique signé électroniquement. Tout mouvement physique non documenté est un dysfonctionnement à corriger.
+
+Appliquer via `cdc-directing-principle.ts` (API mouvements, bons BE/BS/BT signés).
+
+## Glossaire
+
+| Terme | Définition |
+|-------|------------|
+| RFID | Radio-Frequency Identification — identification par ondes radio |
+| Tag | Étiquette électronique sur un article, identifiant unique |
+| Portique | Lecteur RFID fixe aux passages entrée/sortie d'un site |
+| Douchette | Lecteur RFID portatif (inventaire, contrôle) |
+| BE | Bon d'Entrée — entrée de matériel en stock |
+| BS | Bon de Sortie — sortie de matériel d'un site |
+| BT | Bon de Transfert — mouvement inter-sites |
+| ERP | Enterprise Resource Planning |
+
+## 2.1 Constat opérationnel
+
+Parc événementiel à rotation rapide : structures, mobilier, revêtements, technique (son, lumière, froid), accessoires.
+
+Points de friction à résoudre par le produit :
+
+- Pas de traçabilité unitaire → pertes non imputables
+- Inventaires annuels seulement, écarts théorique/physique
+- Pas de bons numériques (BE, BS, transfert inter-sites)
+- Coordination faible : commercial, stock, technique, parc camion
+- ERP inadapté : pas mobile, pas de dashboard, commandes peu fiables
+- Entrepôts surchargés, mélange propre/sale, adressage non respecté
+
+## 2.2 Objectifs stratégiques
+
+| Objectif | Description |
+|----------|-------------|
+| Traçabilité totale | Suivre chaque article à toutes les étapes du cycle de vie |
+| Responsabilité claire | Détenteur responsable identifié en cas de perte/casse |
+| Automatisation | Réduire la saisie manuelle (lecture RFID) |
+| Coordination temps réel | Notifier les acteurs à chaque événement métier |
+| Pilotage par la donnée | Indicateurs fiables pour décisions stratégiques et opérationnelles |
+
+## Bénéfices attendus (cibles produit)
+
+- Responsabilité numérique bout en bout (pertes/casses imputables)
+- Entrées/sorties accélérées (portiques, douchettes)
+- Inventaires fiables (écart cible &lt; 2 %)
+- Coordination commercial / stock / technique / parc camion
+- Tableau de bord temps réel (KPIs, pas de texte CDC)
+
+## Modules (implémentation un par un)
+
+Ordre CDC : **1 → 8**. Ne traiter qu’un module à la fois sauf demande explicite. Statuts et chemins code : `frontend/src/lib/cdc-modules.ts`.
+
+| # | Module | Périmètre |
+|---|--------|-----------|
+| 1 | Identification RFID du matériel | Tags, portique, douchette, association article |
+| 2 | Gestion des commandes | Commandes événement, statuts, allocations |
+| 3 | Mouvements de matériel (BE / BS / BT) | Bons numériques, scan, signatures, mouvements stock |
+| 4 | Traçabilité et chaîne de responsabilité | Détenteur, imputation, chaîne par événement |
+| 5 | Ressources humaines | Effectifs, affectations, véhicules, intérimaires |
+| 6 | Matrice de validation | Droits par rôle, 2FA actions sensibles |
+| 7 | Alertes et notifications | Notifications métier, alertes planifiées |
+| 8 | Tableau de bord et reporting | KPIs, reporting — pas de texte CDC dans l’UI |
+
+État actuel : socle partiel sur les 8 modules (API + écrans de base) ; chaque module sera complété / durci lors de son tour.
+
+## Implémentation
+
+- UI : KPIs, actions, workflows — pas de glossaire ni paragraphes CDC sur le dashboard.
+- Backend : enforcement principe directeur, documents signés, scan RFID, notifications, chaîne de responsabilité.
+- Lors d’une tâche sur le module N : lire `getCdcModule` / `CDC_MODULES[N-1]` et limiter le diff au périmètre de ce module.

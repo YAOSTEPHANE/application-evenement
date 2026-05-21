@@ -6,12 +6,16 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "npm run prisma:generate && next dev --turbopack",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "seed": "npm run prisma:generate && node scripts/run-seed-once.mjs",
+    "seed:cdc": "npm run prisma:generate && npx tsx scripts/seed-cdc-demo.mjs",
+    "prisma:backfill-categories": "node scripts/backfill-category-codes.mjs",
+    "prisma:dedupe-categories": "node scripts/dedupe-categories.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
@@ -20,6 +24,7 @@
     "jose": "^6.2.2",
     "mongodb": "^7.1.1",
     "next": "16.2.1",
+    "otplib": "^13.4.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.3.6"
