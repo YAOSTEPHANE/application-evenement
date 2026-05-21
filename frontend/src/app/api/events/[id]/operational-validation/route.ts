@@ -1,10 +1,11 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import type { OperationalTrioPillar } from "@/lib/cdc-order-trio";
 import { EventOrderDbError, recordOperationalTrioValidation } from "@/lib/event-order-db";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
 
 const bodySchema = z.object({
   pillar: z.enum(["stock", "technical", "fleet"]),
@@ -18,7 +19,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId, actorId, role } = await getRequestContext();
+    const { organizationId, actorId, role } = await requireAuthenticatedContext();
     if (!actorId || !role) {
       return NextResponse.json({ message: "Authentification requise" }, { status: 401 });
     }
@@ -32,6 +33,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof EventOrderDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

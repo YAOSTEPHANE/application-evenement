@@ -1,7 +1,9 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   createWarehouse,
   listWarehouses,
@@ -10,17 +12,21 @@ import {
 
 export async function GET() {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const warehouses = await listWarehouses(organizationId);
     return NextResponse.json(warehouses);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
     return NextResponse.json({ message: "Impossible de charger les entrepôts" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const warehouse = await createWarehouse(organizationId, body);
     return NextResponse.json(warehouse, { status: 201 });

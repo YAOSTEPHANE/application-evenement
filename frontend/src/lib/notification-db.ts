@@ -56,6 +56,14 @@ export async function markNotificationRead(organizationId: string, userId: strin
   });
 }
 
+export async function markAllNotificationsRead(organizationId: string, userId: string) {
+  const result = await prisma.notification.updateMany({
+    where: { organizationId, userId, readAt: null },
+    data: { readAt: new Date() },
+  });
+  return result.count;
+}
+
 export async function notificationCounts(organizationId: string, userId: string) {
   const [urgent, warning, unread] = await Promise.all([
     prisma.notification.count({

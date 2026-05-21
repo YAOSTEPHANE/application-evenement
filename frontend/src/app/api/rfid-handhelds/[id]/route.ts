@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,16 +9,18 @@ import {
   RfidHandheldDbError,
   updateRfidHandheld,
 } from "@/lib/rfid-handheld-db";
-import { getRequestContext } from "@/lib/request-context";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { id } = await params;
     return NextResponse.json(await getRfidHandheld(organizationId, id));
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof RfidHandheldDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }
@@ -26,11 +30,14 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { id } = await params;
     const body = await request.json();
     return NextResponse.json(await updateRfidHandheld(organizationId, id, body));
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof RfidHandheldDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }
@@ -43,10 +50,13 @@ export async function PATCH(request: Request, { params }: Params) {
 
 export async function DELETE(_request: Request, { params }: Params) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { id } = await params;
     return NextResponse.json(await deleteRfidHandheld(organizationId, id));
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof RfidHandheldDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

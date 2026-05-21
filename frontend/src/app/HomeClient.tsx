@@ -154,8 +154,23 @@ function HomeApp() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [themeMode, setThemeMode] = useState<"light" | "dark">("light");
+  const [notifCounts, setNotifCounts] = useState({ urgent: 0, warning: 0, unread: 0 });
 
   const appCounts = useMemo(() => counts(state), [state]);
+  const sidebarAlertesBadge = appCounts.alertes + notifCounts.unread;
+
+  const refreshNotificationCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        counts?: { urgent: number; warning: number; unread: number };
+      };
+      setNotifCounts(data.counts ?? { urgent: 0, warning: 0, unread: 0 });
+    } catch {
+      /* réseau ou session */
+    }
+  }, []);
   const currentUser = useMemo(() => currentUserDisplay(state), [state]);
   const userOptions = useMemo(() => buildUserOptions(state), [state]);
   const affectArticleOptions = useMemo(() => buildAffectArticleOptions(state), [state]);
@@ -214,6 +229,15 @@ function HomeApp() {
       cancelled = true;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+    void refreshNotificationCounts();
+    const timer = window.setInterval(() => void refreshNotificationCounts(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [sessionReady, refreshNotificationCounts]);
 
   async function refreshStateFromApi() {
     const myGen = ++refreshApiGenRef.current;
@@ -1075,6 +1099,7 @@ function HomeApp() {
         userInitials={currentUser.initials}
         userFullName={currentUser.fullName}
         userAvatarUrl={currentUser.avatarUrl}
+        notificationUnread={notifCounts.unread}
         onOpenAlerts={() => navigateToPage("alertes")}
         onOpenProfile={() => navigateToPage("profil")}
         onOpenSettings={() => navigateToPage("parametres")}
@@ -1085,7 +1110,7 @@ function HomeApp() {
       <Sidebar
         activePage={activePage}
         onNavigate={navigateToPage}
-        alertesCount={appCounts.alertes}
+        alertesCount={sidebarAlertesBadge}
         userInitials={currentUser.initials}
         userFullName={currentUser.fullName}
         userAvatarUrl={currentUser.avatarUrl}
@@ -1270,6 +1295,7 @@ function HomeApp() {
               showToast(error instanceof Error ? error.message : "Actualisation impossible", "danger");
             });
         }}
+        onNotificationCountsChange={setNotifCounts}
         onOrderArticle={(articleId) => {
           const article = state.articles.find((item) => item.id === articleId);
           if (!article) {

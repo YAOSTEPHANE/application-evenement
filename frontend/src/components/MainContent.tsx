@@ -83,6 +83,11 @@ type MainContentProps = {
   onToggleTheme?: () => void;
   onImportCsv: (file: File) => void;
   onRefreshAlerts: () => void;
+  onNotificationCountsChange?: (counts: {
+    urgent: number;
+    warning: number;
+    unread: number;
+  }) => void;
   onOrderArticle: (articleId: string) => void;
   onGeneratePackingList: (eventId: string) => void;
   onPrintReport: () => void;
@@ -214,6 +219,7 @@ export function MainContent({
   onToggleTheme,
   onImportCsv,
   onRefreshAlerts,
+  onNotificationCountsChange,
   onOrderArticle,
   onGeneratePackingList,
   onPrintReport,
@@ -850,6 +856,8 @@ export function MainContent({
             onRefreshStock={onRefreshAlerts}
             onEditArticle={onEditArticle}
             onOrderArticle={onOrderArticle}
+            onNavigate={onNavigate}
+            onCountsChange={onNotificationCountsChange}
           />
         ) : null}
       </div>

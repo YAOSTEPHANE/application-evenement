@@ -1,13 +1,15 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { ItemCondition, RfidTagType, TrackedAssetStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getRequestContext } from "@/lib/request-context";
+
 import { createTrackedAsset, listTrackedAssets, RfidDbError, suggestNextTagCode } from "@/lib/rfid-db";
 
 export async function GET(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { searchParams } = new URL(request.url);
     const suggest = searchParams.get("suggest");
     const categoryCode = searchParams.get("categoryCode") ?? "GEN";
@@ -30,14 +32,18 @@ export async function GET(request: Request) {
         rfidTagType && rfidTagType in RfidTagType ? (rfidTagType as RfidTagType) : undefined,
     });
     return NextResponse.json(assets);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
     return NextResponse.json({ message: "Impossible de charger les tags" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const asset = await createTrackedAsset(organizationId, body);
     return NextResponse.json(asset, { status: 201 });

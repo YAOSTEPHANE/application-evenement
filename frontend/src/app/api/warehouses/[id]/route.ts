@@ -1,8 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   deleteWarehouse,
   getWarehouse,
@@ -18,7 +20,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const warehouse = await getWarehouse(organizationId, id);
     return NextResponse.json(warehouse);
   } catch (error) {
@@ -35,7 +37,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const warehouse = await updateWarehouse(organizationId, id, body);
     return NextResponse.json(warehouse);
@@ -59,7 +61,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     await deleteWarehouse(organizationId, id);
     return NextResponse.json({ ok: true });
   } catch (error) {

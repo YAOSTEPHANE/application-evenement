@@ -8,6 +8,8 @@ type TopbarProps = {
   userInitials?: string;
   userFullName?: string;
   userAvatarUrl?: string;
+  /** Notifications métier non lues (pastille cloche). */
+  notificationUnread?: number;
   onOpenAlerts?: () => void;
   onOpenProfile?: () => void;
   onOpenSettings?: () => void;
@@ -20,6 +22,7 @@ export function Topbar({
   userInitials = "AD",
   userFullName = "Aminata Diallo",
   userAvatarUrl = "",
+  notificationUnread = 0,
   onOpenAlerts,
   onOpenProfile,
   onOpenSettings,
@@ -60,9 +63,22 @@ export function Topbar({
           <AppIcon name={themeMode === "dark" ? "themeSun" : "themeMoon"} size={18} />
         </button>
 
-        <button type="button" className="icon-btn" onClick={() => onOpenAlerts?.()} title="Alertes">
+        <button
+          type="button"
+          className="icon-btn icon-btn--notif"
+          onClick={() => onOpenAlerts?.()}
+          title={
+            notificationUnread > 0
+              ? `${notificationUnread} notification(s) non lue(s)`
+              : "Alertes et notifications"
+          }
+        >
           <AppIcon name="alerts" size={18} />
-          <span className="notif-dot" id="notifDot" aria-hidden="true" />
+          {notificationUnread > 0 ? (
+            <span className="notif-dot notif-dot--count" id="notifDot" aria-hidden="true">
+              {notificationUnread > 9 ? "9+" : notificationUnread}
+            </span>
+          ) : null}
         </button>
 
         <button type="button" className="icon-btn" onClick={() => onOpenSettings?.()} title="Paramètres">

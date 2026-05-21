@@ -1,11 +1,12 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 export async function GET() {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const rows = await prisma.documentArchive.findMany({
       where: { organizationId },
       orderBy: { createdAt: "desc" },
@@ -26,7 +27,10 @@ export async function GET() {
       },
     });
     return NextResponse.json(rows);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Archives indisponibles" }, { status: 500 });
   }
 }

@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -8,11 +10,11 @@ import {
   LocationStockDbError,
   upsertLocationStockBalance,
 } from "@/lib/location-stock-db";
-import { getRequestContext } from "@/lib/request-context";
+
 
 export async function GET(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const url = new URL(request.url);
     const warehouseId = url.searchParams.get("warehouseId") ?? undefined;
     const storageZoneId = url.searchParams.get("storageZoneId") ?? undefined;
@@ -51,7 +53,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const row = await upsertLocationStockBalance(organizationId, body);
     return NextResponse.json(row);

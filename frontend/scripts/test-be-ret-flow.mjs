@@ -2,6 +2,8 @@
  * Test flux BE-RET → clôture Soldée
  * Prérequis : serveur sur :3000, seed CDC (npx tsx scripts/seed-cdc-demo.mjs)
  * Usage : npx tsx scripts/test-be-ret-flow.mjs
+ *
+ * En-têtes x-actor-id : définir ALLOW_LEGACY_API_HEADERS=true dans frontend/.env.local
  */
 const base = process.env.API_BASE ?? "http://localhost:3000";
 const org = "000000000000000000000001";

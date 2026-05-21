@@ -1,8 +1,9 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 const querySchema = z.object({
   take: z.coerce.number().int().min(1).max(200).optional().default(50),
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
       );
     }
     const { take, skip } = parsed.data;
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const [logs, total] = await Promise.all([
       prisma.auditLog.findMany({
@@ -47,7 +48,10 @@ export async function GET(request: Request) {
       skip,
       logs,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Impossible de charger le journal" }, { status: 500 });
   }
 }

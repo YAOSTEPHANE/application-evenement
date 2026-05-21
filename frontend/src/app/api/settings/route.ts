@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,7 +11,7 @@ import {
   updateOrganizationSettings,
 } from "@/lib/organization-settings-db";
 import { organizationSettingsSchema } from "@/lib/organization-settings";
-import { getRequestContext } from "@/lib/request-context";
+
 import { getApiOriginForDisplay } from "@/lib/stock/api";
 
 const patchSchema = z.object({
@@ -19,7 +21,7 @@ const patchSchema = z.object({
 
 export async function GET() {
   try {
-    const { organizationId, actorId, role } = await getRequestContext();
+    const { organizationId, actorId, role } = await requireAuthenticatedContext();
     if (!actorId) {
       return NextResponse.json({ message: "Session requise" }, { status: 401 });
     }
@@ -33,6 +35,9 @@ export async function GET() {
       },
     });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof OrganizationSettingsError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }
@@ -42,7 +47,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const { organizationId, actorId, role } = await getRequestContext();
+    const { organizationId, actorId, role } = await requireAuthenticatedContext();
     if (!actorId) {
       return NextResponse.json({ message: "Session requise" }, { status: 401 });
     }
@@ -54,6 +59,9 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ organization });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof OrganizationSettingsError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

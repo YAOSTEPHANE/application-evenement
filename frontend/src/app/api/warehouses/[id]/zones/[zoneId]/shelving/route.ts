@@ -1,8 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
+
 import { createShelvingNode, listShelvingNodes, ShelvingDbError } from "@/lib/shelving-db";
 
 type RouteParams = { params: Promise<{ id: string; zoneId: string }> };
@@ -13,7 +15,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(warehouseId) || !isValidMongoObjectId(zoneId)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const nodes = await listShelvingNodes(organizationId, warehouseId, zoneId);
     return NextResponse.json(nodes);
   } catch (error) {
@@ -30,7 +32,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(warehouseId) || !isValidMongoObjectId(zoneId)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const node = await createShelvingNode(organizationId, warehouseId, zoneId, body);
     return NextResponse.json(node, { status: 201 });

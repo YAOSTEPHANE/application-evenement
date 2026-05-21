@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { EventLifecycle, OrderStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -6,7 +8,6 @@ import { notifyRoleGroup } from "@/lib/cdc-notification-dispatch";
 import { validateOrderStatusChange } from "@/lib/cdc-order-rules";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -33,7 +34,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const event = await prisma.event.findFirst({
       where: { id, organizationId },
@@ -52,7 +53,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     return NextResponse.json(event);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Impossible de charger l'événement" }, { status: 500 });
   }
 }
@@ -65,7 +69,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
     const body = await request.json();
     const payload = updateEventSchema.parse(body);
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const existing = await prisma.event.findFirst({
       where: { id, organizationId },
@@ -145,6 +149,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Payload invalide", errors: error.flatten() },
@@ -161,7 +168,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const existing = await prisma.event.findFirst({
       where: { id, organizationId },
@@ -187,7 +194,10 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Impossible de supprimer l'événement" }, { status: 500 });
   }
 }

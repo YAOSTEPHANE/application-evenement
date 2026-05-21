@@ -1,10 +1,11 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 export async function GET() {
-  const { organizationId, actorId, authMethod } = await getRequestContext();
+  const { organizationId, actorId, authMethod } = await requireAuthenticatedContext();
 
   if (!actorId || authMethod === "none") {
     return NextResponse.json({ message: "Non authentifié." }, { status: 401 });

@@ -1,12 +1,14 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { listRfidHandhelds } from "@/lib/rfid-handheld-db";
 import { listRfidPortals } from "@/lib/rfid-portal-db";
-import { getRequestContext } from "@/lib/request-context";
+
 
 export async function GET() {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const [portals, handhelds] = await Promise.all([
       listRfidPortals(organizationId, true),
       listRfidHandhelds(organizationId, true),
@@ -49,7 +51,11 @@ export async function GET() {
         handheldsAdmin: "/api/rfid-handhelds",
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
     return NextResponse.json({ message: "Matériel indisponible" }, { status: 500 });
   }
 }

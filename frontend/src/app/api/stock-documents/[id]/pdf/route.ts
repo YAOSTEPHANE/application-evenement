@@ -1,7 +1,9 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { archiveSignedDocument } from "@/lib/document-archive";
-import { getRequestContext } from "@/lib/request-context";
+
 import { prisma } from "@/lib/prisma";
 import { getStockDocument, StockDocumentDbError } from "@/lib/stock-document-db";
 import { renderStockDocumentHtml } from "@/lib/stock-document-html";
@@ -10,7 +12,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { id } = await params;
     const doc = await getStockDocument(organizationId, id);
     const org = await prisma.organization.findUnique({

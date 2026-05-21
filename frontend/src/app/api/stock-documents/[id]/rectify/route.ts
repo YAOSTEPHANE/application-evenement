@@ -1,7 +1,8 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getRequestContext } from "@/lib/request-context";
 import { assertSensitiveActionAllowed, SensitiveAuthError } from "@/lib/require-sensitive-auth";
 import { createRectificatoryDocument, StockDocumentDbError } from "@/lib/stock-document-db";
 
@@ -13,7 +14,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const ctx = await getRequestContext();
+    const ctx = await requireAuthenticatedContext();
     const { organizationId, role } = ctx;
     if (!role) {
       return NextResponse.json({ message: "Session requise" }, { status: 401 });
@@ -24,6 +25,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     const doc = await createRectificatoryDocument(organizationId, id, role, body.reason);
     return NextResponse.json(doc, { status: 201 });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof SensitiveAuthError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

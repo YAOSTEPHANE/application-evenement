@@ -1,8 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { EventLifecycle, MovementType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
+
 import { computeStockLevelStatus, isStockAlertStatus, stockLevelsFromDb } from "@/lib/stock-level-helpers";
 
 function utcDayKey(d: Date): string {
@@ -22,7 +24,7 @@ function lastNDayKeys(n: number): string[] {
 }
 
 export async function GET() {
-  const { organizationId } = await getRequestContext();
+  const { organizationId } = await requireAuthenticatedContext();
 
   const since14 = new Date();
   since14.setUTCDate(since14.getUTCDate() - 14);

@@ -1,7 +1,8 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { RfidTagType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-import { getRequestContext } from "@/lib/request-context";
 import { listRfidCatalog } from "@/lib/rfid-db";
 
 function parseTagType(value: string | null): RfidTagType | undefined {
@@ -11,7 +12,7 @@ function parseTagType(value: string | null): RfidTagType | undefined {
 
 export async function GET(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { searchParams } = new URL(request.url);
     const rows = await listRfidCatalog(organizationId, {
       q: searchParams.get("q") ?? undefined,
@@ -19,7 +20,10 @@ export async function GET(request: Request) {
       defaultRfidTagType: parseTagType(searchParams.get("defaultRfidTagType")),
     });
     return NextResponse.json(rows);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Catalogue RFID indisponible" }, { status: 500 });
   }
 }

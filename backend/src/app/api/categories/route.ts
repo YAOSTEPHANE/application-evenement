@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,21 +8,23 @@ import {
   createCategory,
   listCategories,
 } from "@/lib/category-db";
-import { getRequestContext } from "@/lib/request-context";
 
 export async function GET() {
-  const { organizationId } = await getRequestContext();
+  const { organizationId } = await requireAuthenticatedContext();
   const categories = await listCategories(organizationId);
   return NextResponse.json(categories);
 }
 
 export async function POST(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const category = await createCategory(organizationId, body);
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof CategoryDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

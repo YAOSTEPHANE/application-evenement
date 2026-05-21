@@ -1,9 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { getEventOrderDetail, renderEventOrderHtml } from "@/lib/event-order-db";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -13,7 +14,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
       select: { name: true },
@@ -27,7 +28,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         "Content-Disposition": `inline; filename="commande-${detail.event.name.replace(/[^\w-]+/g, "_")}.html"`,
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Export PDF indisponible" }, { status: 500 });
   }
 }

@@ -1,11 +1,13 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { exportDailyWorkersCsv } from "@/lib/document-archive";
-import { getRequestContext } from "@/lib/request-context";
+
 
 export async function GET(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { searchParams } = new URL(request.url);
     const fromStr = searchParams.get("from");
     const toStr = searchParams.get("to");
@@ -22,7 +24,11 @@ export async function GET(request: Request) {
         "X-Row-Count": String(count),
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
     return NextResponse.json({ message: "Export impossible" }, { status: 500 });
   }
 }

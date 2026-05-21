@@ -1,8 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { deleteLocationStockBalance, LocationStockDbError } from "@/lib/location-stock-db";
-import { getRequestContext } from "@/lib/request-context";
+
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -12,7 +14,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     await deleteLocationStockBalance(organizationId, id);
     return NextResponse.json({ ok: true });
   } catch (error) {

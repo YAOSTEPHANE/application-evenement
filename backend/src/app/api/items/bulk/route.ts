@@ -1,9 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const payload = bulkBodySchema.parse(body);
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const categoryIds = [...new Set(payload.items.map((row) => row.categoryId))];
     const categories = await prisma.category.findMany({
@@ -75,6 +76,9 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Payload invalide", errors: error.flatten() },

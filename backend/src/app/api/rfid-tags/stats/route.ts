@@ -1,12 +1,13 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { TrackedAssetStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 export async function GET() {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const [totalUnits, quarantine, onSite, inTransit, catalogAgg, itemsCount] = await Promise.all([
       prisma.trackedAsset.count({ where: { organizationId } }),
@@ -48,7 +49,10 @@ export async function GET() {
       distinctItemsTagged: taggedSum.length,
       coveragePct,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Statistiques RFID indisponibles" }, { status: 500 });
   }
 }

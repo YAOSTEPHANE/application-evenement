@@ -1,10 +1,11 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { applyStockDelta, loadStockQuantities } from "@/lib/item-variant-helpers";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -25,7 +26,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const body = await request.json();
     const payload = allocationSchema.parse(body);
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const event = await prisma.event.findFirst({
       where: { id: eventId, organizationId },
@@ -145,6 +146,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(eventItem, { status: 201 });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Payload invalide", errors: error.flatten() },

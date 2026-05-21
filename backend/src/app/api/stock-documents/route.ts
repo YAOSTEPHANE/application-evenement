@@ -1,9 +1,11 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { StockDocumentKind, StockDocumentStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { assertSensitiveActionAllowed, SensitiveAuthError } from "@/lib/require-sensitive-auth";
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   createStockDocument,
   listStockDocuments,
@@ -12,7 +14,7 @@ import {
 
 export async function GET(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { searchParams } = new URL(request.url);
     const kind = searchParams.get("kind");
     const status = searchParams.get("status");
@@ -26,14 +28,18 @@ export async function GET(request: Request) {
       search,
     });
     return NextResponse.json(documents);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
     return NextResponse.json({ message: "Impossible de charger les bons" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const ctx = await getRequestContext();
+    const ctx = await requireAuthenticatedContext();
     const { organizationId, role } = ctx;
     const body = await request.json();
     if (body?.kind === "BS" || body?.kind === "BT") {

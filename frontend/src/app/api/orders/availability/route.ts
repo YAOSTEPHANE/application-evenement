@@ -1,12 +1,13 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { getCatalogAvailability } from "@/lib/event-order-db";
 import { isValidMongoObjectId } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
 
 export async function GET(request: Request) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { searchParams } = new URL(request.url);
     const startsAt = searchParams.get("startsAt");
     const endsAt = searchParams.get("endsAt");
@@ -31,7 +32,10 @@ export async function GET(request: Request) {
 
     const rows = await getCatalogAvailability(organizationId, start, end, excludeEventId);
     return NextResponse.json(rows);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Disponibilités indisponibles" }, { status: 500 });
   }
 }

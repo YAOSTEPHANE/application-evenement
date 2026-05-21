@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { MovementType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -11,10 +13,9 @@ import {
 } from "@/lib/movement-helpers";
 import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 export async function GET(request: Request) {
-  const { organizationId } = await getRequestContext();
+  const { organizationId } = await requireAuthenticatedContext();
   const url = new URL(request.url);
   const typeParam = url.searchParams.get("type");
   const limit = Math.min(Number.parseInt(url.searchParams.get("limit") ?? "500", 10) || 500, 1000);
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const payload = movementCreateSchema.parse(body);
-    const { organizationId, actorId, role } = await getRequestContext();
+    const { organizationId, actorId, role } = await requireAuthenticatedContext();
 
     const item = await prisma.item.findFirst({
       where: { id: payload.itemId, organizationId },
@@ -182,6 +183,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result.movement, { status: 201 });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Payload invalide", errors: error.flatten() },

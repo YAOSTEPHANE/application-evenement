@@ -1,7 +1,9 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   assertHrStaffAdmin,
   createStaffMember,
@@ -13,16 +15,20 @@ import {
 
 export async function GET() {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     return NextResponse.json(await listStaffProfiles(organizationId));
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
     return NextResponse.json({ message: "Impossible de charger le personnel" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { organizationId, actorId, role } = await getRequestContext();
+    const { organizationId, actorId, role } = await requireAuthenticatedContext();
     assertHrStaffAdmin(role, actorId);
     const body = await request.json();
     const profile = isLinkStaffPayload(body)

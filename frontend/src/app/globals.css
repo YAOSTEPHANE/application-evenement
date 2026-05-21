@@ -152,6 +152,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   position:absolute;top:4px;right:4px;width:8px;height:8px;
   background:var(--gold);border-radius:50%;border:1.5px solid var(--navy);
 }
+.icon-btn--notif{overflow:visible}
+.notif-dot--count{
+  min-width:16px;height:16px;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;color:var(--navy);
+  border-radius:var(--r999);top:0;right:0;
+}
 .user-chip{
   display:flex;align-items:center;gap:8px;padding:5px 12px 5px 5px;
   border-radius:var(--r999);border:1px solid rgba(255,255,255,.15);
@@ -3798,8 +3805,14 @@ body[data-theme="dark"] .rfid-chip--active{color:var(--gold2)}
 }
 .cdc-notif-item:hover{border-color:var(--gold);box-shadow:var(--sh1)}
 .cdc-notif-item--read{opacity:.6}
+.cdc-notif-item--urgent{border-left:3px solid var(--danger)}
 .cdc-notif-item-hd{display:flex;align-items:flex-start;gap:8px}
 .cdc-notif-item-hd .fw500{flex:1}
+.cdc-notif-item-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.alerts-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px}
+.alerts-filter-check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2)}
+.alerts-filter-select{max-width:200px;min-height:36px}
+.fc-gold{color:var(--gold)}
 /* Module RH — premium */
 .hr-premium{--hr-accent:var(--gold)}
 .hr-hero{

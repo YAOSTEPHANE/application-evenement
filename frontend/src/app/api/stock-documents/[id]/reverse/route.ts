@@ -1,16 +1,18 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { assertSensitiveActionAllowed } from "@/lib/require-sensitive-auth";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
+
 import { createContraDocument, StockDocumentDbError } from "@/lib/stock-document-db";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const ctx = await getRequestContext();
+    const ctx = await requireAuthenticatedContext();
     await assertSensitiveActionAllowed(ctx);
     const { id } = await params;
     if (!isValidMongoObjectId(id)) {
@@ -28,6 +30,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
     return NextResponse.json(doc, { status: 201 });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof StockDocumentDbError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }

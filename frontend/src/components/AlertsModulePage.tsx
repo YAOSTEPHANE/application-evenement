@@ -1,28 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppIcon } from "@/components/icons/AppIcon";
+import type { PageId } from "@/components/Sidebar";
+import {
+  resolveNotificationNav,
+  severityBadgeClass,
+  type NotificationRow,
+} from "@/lib/notification-navigation";
 import { clientFetch } from "@/lib/stock/api";
 import { dispo, fmtNum } from "@/lib/stock/helpers";
 import type { Article } from "@/lib/stock/types";
 
-type NotificationRow = {
-  id: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  readAt: string | null;
-  severity?: string;
-};
-
 type TabId = "metier" | "stock";
+type SeverityFilter = "all" | "URGENT" | "WARNING" | "INFO";
 
 type AlertsModulePageProps = {
   stockAlerts: Article[];
   onRefreshStock: () => void;
   onEditArticle: (articleId: string) => void;
   onOrderArticle: (articleId: string) => void;
+  onNavigate?: (page: PageId) => void;
+  onCountsChange?: (counts: { urgent: number; warning: number; unread: number }) => void;
 };
 
 export function AlertsModulePage({
@@ -30,31 +30,44 @@ export function AlertsModulePage({
   onRefreshStock,
   onEditArticle,
   onOrderArticle,
+  onNavigate,
+  onCountsChange,
 }: AlertsModulePageProps) {
   const [tab, setTab] = useState<TabId>("metier");
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [counts, setCounts] = useState({ urgent: 0, warning: 0, unread: 0 });
   const [loading, setLoading] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await clientFetch("/api/notifications");
+      const q = unreadOnly ? "?unread=1" : "";
+      const res = await clientFetch(`/api/notifications${q}`);
       if (!res.ok) return;
       const data = (await res.json()) as {
         items?: NotificationRow[];
         counts?: { urgent: number; warning: number; unread: number };
       };
-      setItems(data.items ?? []);
-      setCounts(data.counts ?? { urgent: 0, warning: 0, unread: 0 });
+      const nextItems = data.items ?? [];
+      const nextCounts = data.counts ?? { urgent: 0, warning: 0, unread: 0 };
+      setItems(nextItems);
+      setCounts(nextCounts);
+      onCountsChange?.(nextCounts);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onCountsChange, unreadOnly]);
 
   useEffect(() => {
     void loadNotifications();
   }, [loadNotifications]);
+
+  const filteredItems = useMemo(() => {
+    if (severityFilter === "all") return items;
+    return items.filter((n) => (n.severity ?? "INFO") === severityFilter);
+  }, [items, severityFilter]);
 
   async function markRead(id: string) {
     await clientFetch("/api/notifications", {
@@ -63,6 +76,25 @@ export function AlertsModulePage({
       body: JSON.stringify({ id }),
     });
     await loadNotifications();
+  }
+
+  async function markAllRead() {
+    await clientFetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
+    await loadNotifications();
+  }
+
+  function openNotification(n: NotificationRow) {
+    void (async () => {
+      if (!n.readAt) {
+        await markRead(n.id);
+      }
+      const target = resolveNotificationNav(n);
+      onNavigate?.(target.page);
+    })();
   }
 
   return (
@@ -85,6 +117,11 @@ export function AlertsModulePage({
           >
             ↻ Actualiser
           </button>
+          {tab === "metier" && counts.unread > 0 ? (
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => void markAllRead()}>
+              Tout marquer lu
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -122,31 +159,62 @@ export function AlertsModulePage({
             <span className="badge badge-warn">Avert. {counts.warning}</span>
             <span className="badge badge-info">Non lues {counts.unread}</span>
           </div>
+
+          <div className="alerts-filters">
+            <label className="alerts-filter-check">
+              <input
+                type="checkbox"
+                checked={unreadOnly}
+                onChange={(e) => setUnreadOnly(e.target.checked)}
+              />
+              Non lues uniquement
+            </label>
+            <select
+              className="inp alerts-filter-select"
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)}
+              aria-label="Filtrer par gravité"
+            >
+              <option value="all">Toutes gravités</option>
+              <option value="URGENT">Urgent</option>
+              <option value="WARNING">Avertissement</option>
+              <option value="INFO">Info</option>
+            </select>
+          </div>
+
           {loading ? <p className="fs12 text-muted">Chargement…</p> : null}
-          {items.map((n) => (
+          {filteredItems.map((n) => (
             <div
               key={n.id}
-              className={`cdc-notif-item${n.readAt ? " cdc-notif-item--read" : ""}`}
-              onClick={() => void markRead(n.id)}
-              onKeyDown={(e) => e.key === "Enter" && void markRead(n.id)}
+              className={`cdc-notif-item${n.readAt ? " cdc-notif-item--read" : ""}${n.severity === "URGENT" ? " cdc-notif-item--urgent" : ""}`}
+              onClick={() => openNotification(n)}
+              onKeyDown={(e) => e.key === "Enter" && openNotification(n)}
               role="button"
               tabIndex={0}
             >
               <div className="cdc-notif-item-hd">
                 <AppIcon name="alerts" size={16} />
                 <div className="fw500">{n.title}</div>
+                <span className={`badge ${severityBadgeClass(n.severity)}`}>
+                  {n.severity === "URGENT" ? "Urgent" : n.severity === "WARNING" ? "Avert." : "Info"}
+                </span>
               </div>
               <div className="fs12">{n.body}</div>
-              <div className="fs11 text-muted">{new Date(n.createdAt).toLocaleString("fr-FR")}</div>
+              <div className="cdc-notif-item-ft">
+                <span className="fs11 text-muted">{new Date(n.createdAt).toLocaleString("fr-FR")}</span>
+                {onNavigate ? (
+                  <span className="fs11 fc-gold">Ouvrir → {resolveNotificationNav(n).label}</span>
+                ) : null}
+              </div>
             </div>
           ))}
-          {!loading && items.length === 0 ? (
+          {!loading && filteredItems.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">✓</div>
               <h3>Aucune notification métier</h3>
               <p>
-                Les alertes planifiées (retour J+1, signatures en attente, transferts bloqués) apparaissent
-                ici lorsque le cycle CDC est exécuté (planification serveur).
+                Les alertes (retour J+1, signatures en attente, transferts bloqués) apparaissent ici
+                lorsque le cycle CDC est exécuté côté serveur.
               </p>
             </div>
           ) : null}

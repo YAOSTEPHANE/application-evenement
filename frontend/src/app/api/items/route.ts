@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -16,7 +18,6 @@ import {
 } from "@/lib/item-variant-helpers";
 import { isValidMongoObjectId } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 const objectId = z.string().refine(isValidMongoObjectId, { message: "ObjectId invalide" });
 
@@ -70,7 +71,7 @@ function serializeItemWithVariants(
 
 export async function GET() {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const items = await prisma.item.findMany({
       where: { organizationId },
@@ -86,6 +87,9 @@ export async function GET() {
 
     return NextResponse.json(items.map(serializeItemWithVariants));
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     console.error("[GET /api/items]", error);
     const message =
       error instanceof Error
@@ -99,7 +103,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const payload = createItemSchema.parse(body);
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const category = await prisma.category.findFirst({
       where: { id: payload.categoryId, organizationId },
@@ -148,6 +152,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeItemWithVariants(item), { status: 201 });
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Payload invalide", errors: error.flatten() },

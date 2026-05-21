@@ -1,10 +1,11 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 const createUserSchema = z.object({
   username: z
@@ -19,7 +20,7 @@ const createUserSchema = z.object({
 });
 
 export async function GET() {
-  const { organizationId, actorId, role } = await getRequestContext();
+  const { organizationId, actorId, role } = await requireAuthenticatedContext();
 
   if (!actorId) {
     return NextResponse.json({ message: "Non authentifié." }, { status: 401 });
@@ -46,7 +47,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { organizationId, actorId, role } = await getRequestContext();
+    const { organizationId, actorId, role } = await requireAuthenticatedContext();
 
     if (!actorId || role !== Role.ADMIN) {
       return NextResponse.json(

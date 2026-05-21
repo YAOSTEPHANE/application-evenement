@@ -1,15 +1,17 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { assertSensitiveActionAllowed, SensitiveAuthError } from "@/lib/require-sensitive-auth";
-import { getRequestContext } from "@/lib/request-context";
+
 import { cancelStockDocument, StockDocumentDbError } from "@/lib/stock-document-db";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const ctx = await getRequestContext();
+    const ctx = await requireAuthenticatedContext();
     await assertSensitiveActionAllowed(ctx);
     const { organizationId, role } = ctx;
     if (!role) {

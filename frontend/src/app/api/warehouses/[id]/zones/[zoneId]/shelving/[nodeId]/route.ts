@@ -1,8 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   deleteShelvingNode,
   getShelvingNode,
@@ -22,7 +24,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     ) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const node = await getShelvingNode(organizationId, warehouseId, zoneId, nodeId);
     return NextResponse.json(node);
   } catch (error) {
@@ -43,7 +45,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     ) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const node = await updateShelvingNode(organizationId, warehouseId, zoneId, nodeId, body);
     return NextResponse.json(node);
@@ -71,7 +73,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     ) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     await deleteShelvingNode(organizationId, warehouseId, zoneId, nodeId);
     return NextResponse.json({ ok: true });
   } catch (error) {

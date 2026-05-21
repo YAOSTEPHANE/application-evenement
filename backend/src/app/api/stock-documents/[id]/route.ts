@@ -1,7 +1,9 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   getStockDocument,
   StockDocumentDbError,
@@ -13,7 +15,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { id } = await params;
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
@@ -30,7 +32,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const { id } = await params;
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();

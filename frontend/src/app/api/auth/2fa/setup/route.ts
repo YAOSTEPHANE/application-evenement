@@ -1,12 +1,14 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getRequestContext } from "@/lib/request-context";
+
 import { prisma } from "@/lib/prisma";
 import { buildOtpAuthUri, generateTotpSecret, verifyTotpCode } from "@/lib/totp-auth";
 
 export async function GET() {
-  const { actorId, organizationId } = await getRequestContext();
+  const { actorId, organizationId } = await requireAuthenticatedContext();
   if (!actorId) {
     return NextResponse.json({ message: "Non authentifié" }, { status: 401 });
   }
@@ -22,7 +24,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { actorId, organizationId } = await getRequestContext();
+    const { actorId, organizationId } = await requireAuthenticatedContext();
     if (!actorId) {
       return NextResponse.json({ message: "Non authentifié" }, { status: 401 });
     }

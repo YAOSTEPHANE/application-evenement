@@ -1,3 +1,5 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -15,7 +17,6 @@ import {
 } from "@/lib/item-variant-helpers";
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -54,7 +55,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const item = await prisma.item.findFirst({
       where: { id, organizationId },
@@ -66,7 +67,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     return NextResponse.json(serializeItemWithVariants(item));
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Impossible de charger l'article" }, { status: 500 });
   }
 }
@@ -79,7 +83,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
     const body = await request.json();
     const payload = updateItemSchema.parse(body);
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const existing = await prisma.item.findFirst({
       where: { id, organizationId },
@@ -183,6 +187,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(serializeItemWithVariants(item));
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     if (error instanceof Error && error.message === "STOCK_TOO_LOW") {
       return NextResponse.json(
         {
@@ -211,7 +218,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(id)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const existing = await prisma.item.findFirst({
       where: { id, organizationId },
@@ -231,7 +238,10 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     await prisma.item.delete({ where: { id } });
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Impossible de supprimer l'article" }, { status: 500 });
   }
 }

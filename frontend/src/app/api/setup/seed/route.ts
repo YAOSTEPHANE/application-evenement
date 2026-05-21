@@ -27,7 +27,11 @@ export async function POST(request: Request) {
       if (parsed.success && parsed.data?.demo === false) {
         demo = false;
       }
-    } catch {
+    } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
       // corps vide → demo par défaut
     }
 

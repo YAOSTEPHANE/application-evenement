@@ -117,10 +117,7 @@ function isPublicApiPath(pathname: string): boolean {
 }
 
 function legacyHeadersAllowed(): boolean {
-  if (isProductionEnv()) {
-    return process.env.ALLOW_LEGACY_API_HEADERS === "true";
-  }
-  return process.env.ALLOW_LEGACY_API_HEADERS !== "false";
+  return process.env.ALLOW_LEGACY_API_HEADERS === "true";
 }
 
 async function hasValidSession(request: NextRequest): Promise<boolean> {

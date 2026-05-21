@@ -1,8 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   createStorageZone,
   listStorageZones,
@@ -17,7 +19,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(warehouseId)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const zones = await listStorageZones(organizationId, warehouseId);
     return NextResponse.json(zones);
   } catch (error) {
@@ -34,7 +36,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!isValidMongoObjectId(warehouseId)) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const zone = await createStorageZone(organizationId, warehouseId, body);
     return NextResponse.json(zone, { status: 201 });

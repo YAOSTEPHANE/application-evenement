@@ -29,8 +29,7 @@
     "test:all": "npm run test --workspace frontend && npm run test --prefix mobile",
     "check": "npm run test:all && npm run build",
     "verify:prisma": "node scripts/verify-prisma-schemas.mjs",
-    "sync:security": "node scripts/sync-security-to-backend.mjs",
-    "quality": "npm run verify:prisma && npm run prisma:generate --workspace frontend && npm run test && npm run sync:security && npm run typecheck --workspace backend",
+    "quality": "npm run verify:prisma && npm run test:all && npm run typecheck --workspace backend",
     "postinstall": "node scripts/link-backend-to-frontend.mjs",
     "link:backend": "node scripts/link-backend-to-frontend.mjs"
   },

@@ -1,7 +1,8 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 const LIMIT = 15;
 
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
 
     const [items, events, users] = await Promise.all([
       prisma.item.findMany({
@@ -79,7 +80,10 @@ export async function GET(request: Request) {
       events,
       users,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Recherche impossible" }, { status: 500 });
   }
 }

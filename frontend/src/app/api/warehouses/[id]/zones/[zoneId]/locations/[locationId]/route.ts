@@ -1,8 +1,10 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isValidMongoObjectId, jsonInvalidObjectIdResponse } from "@/lib/mongo-id";
-import { getRequestContext } from "@/lib/request-context";
+
 import {
   deleteStorageLocation,
   getStorageLocation,
@@ -22,7 +24,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     ) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const location = await getStorageLocation(organizationId, warehouseId, zoneId, locationId);
     return NextResponse.json(location);
   } catch (error) {
@@ -43,7 +45,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     ) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     const body = await request.json();
     const location = await updateStorageLocation(
       organizationId,
@@ -77,7 +79,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     ) {
       return jsonInvalidObjectIdResponse();
     }
-    const { organizationId } = await getRequestContext();
+    const { organizationId } = await requireAuthenticatedContext();
     await deleteStorageLocation(organizationId, warehouseId, zoneId, locationId);
     return NextResponse.json({ ok: true });
   } catch (error) {

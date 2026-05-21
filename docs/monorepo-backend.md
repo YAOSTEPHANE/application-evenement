@@ -37,5 +37,5 @@ Vercel ne build que **frontend** (`scripts/vercel-build.mjs`). En production, un
 
 ## Validation
 
-- Automatique : `npm run test:all` puis `npm run check` (tests + build — arrêter les serveurs `dev` avant le build).
+- Automatique : `npm run quality` (tests + `tsc` backend) ou `npm run check` (tests + build — arrêter les serveurs `dev` avant le build).
 - Manuelle : [checklist-validation-manuelle.md](./checklist-validation-manuelle.md).

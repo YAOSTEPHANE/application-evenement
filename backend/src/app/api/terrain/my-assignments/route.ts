@@ -1,11 +1,12 @@
+
+import { ApiAuthError, requireAuthenticatedContext } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getRequestContext } from "@/lib/request-context";
 
 export async function GET() {
   try {
-    const { organizationId, actorId } = await getRequestContext();
+    const { organizationId, actorId } = await requireAuthenticatedContext();
     if (!actorId) {
       return NextResponse.json({ message: "Connexion requise" }, { status: 401 });
     }
@@ -45,7 +46,10 @@ export async function GET() {
     ]);
 
     return NextResponse.json({ assignments, leaderEvents });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     return NextResponse.json({ message: "Impossible de charger les affectations" }, { status: 500 });
   }
 }
