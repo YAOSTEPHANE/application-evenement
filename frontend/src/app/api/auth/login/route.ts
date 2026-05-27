@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { mapAuthApiError } from "@/lib/map-auth-api-error";
 import { prisma } from "@/lib/prisma";
 import { createPending2FaToken, PENDING_2FA_COOKIE } from "@/lib/pending-2fa-token";
 import { createSessionToken, SESSION_COOKIE_NAME, sessionMaxAgeSeconds } from "@/lib/session-token";
@@ -109,6 +110,8 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    return NextResponse.json({ message: "Échec de la connexion." }, { status: 500 });
+    console.error("[api/auth/login]", error);
+    const { status, body } = mapAuthApiError(error);
+    return NextResponse.json(body, { status });
   }
 }

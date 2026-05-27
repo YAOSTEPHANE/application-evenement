@@ -2,6 +2,7 @@ import { createHmac, randomBytes } from "crypto";
 
 import { generateSecret, generateURI, verify } from "otplib";
 
+import { resolveAuthJwtSecret } from "@/lib/auth-env";
 import { roleRequires2Fa } from "@/lib/cdc-labels";
 import type { Role } from "@prisma/client";
 
@@ -27,7 +28,7 @@ export function roleMustUse2Fa(role: Role, twoFactorEnabled: boolean): boolean {
 
 /** Empreinte document (intégrité archive) */
 export function hashDocumentContent(html: string): string {
-  return createHmac("sha256", process.env.AUTH_JWT_SECRET ?? "archive-key")
+  return createHmac("sha256", resolveAuthJwtSecret())
     .update(html)
     .digest("hex");
 }

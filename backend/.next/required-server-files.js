@@ -104,7 +104,7 @@ self.__SERVER_FILES_MANIFEST={
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "F:\\gestion evenementiel",
+    "outputFileTracingRoot": "D:\\gestion evenementiel",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -304,7 +304,7 @@ self.__SERVER_FILES_MANIFEST={
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "F:\\gestion evenementiel"
+      "root": "D:\\gestion evenementiel"
     },
     "serverExternalPackages": [
       "@prisma/client",
@@ -316,7 +316,7 @@ self.__SERVER_FILES_MANIFEST={
     ],
     "distDirRoot": ".next"
   },
-  "appDir": "F:\\gestion evenementiel\\backend",
+  "appDir": "D:\\gestion evenementiel\\backend",
   "relativeAppDir": "backend",
   "files": [
     ".next\\routes-manifest.json",

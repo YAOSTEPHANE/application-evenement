@@ -5,7 +5,7 @@
 | Variable | Usage |
 |----------|--------|
 | `DATABASE_URL` | MongoDB (Prisma) |
-| `AUTH_JWT_SECRET` | Cookies de session (≥ 32 caractères) |
+| `AUTH_JWT_SECRET` | Cookies de session (≥ 32 caractères). Alias : `NEXTAUTH_SECRET` |
 | `SEED_SECRET` | `POST /api/setup/seed` — `Authorization: Bearer …` |
 | `CDC_CRON_SECRET` | `POST /api/cdc/alerts/run` — cron planifié |
 | `ALLOW_LEGACY_API_HEADERS` | Mettre `true` **uniquement** pour scripts dev (`x-actor-id` sans JWT) |

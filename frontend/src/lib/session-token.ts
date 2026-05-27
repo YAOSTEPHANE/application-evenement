@@ -1,27 +1,12 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { Role } from "@prisma/client";
 
-import { isProductionEnv } from "@/lib/env-runtime";
+import { resolveAuthJwtSecret } from "@/lib/auth-env";
 
 export const SESSION_COOKIE_NAME = "stockevent_session";
 
-const DEFAULT_DEV_SECRET = "dev-only-stockevent-secret-min-32-chars!!";
-
-function resolveJwtSecret(): string {
-  const configured = process.env.AUTH_JWT_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-  if (isProductionEnv()) {
-    throw new Error(
-      "AUTH_JWT_SECRET est obligatoire en production. Définissez une clé aléatoire d’au moins 32 caractères.",
-    );
-  }
-  return DEFAULT_DEV_SECRET;
-}
-
 export function getJwtSecretKey(): Uint8Array {
-  return new TextEncoder().encode(resolveJwtSecret());
+  return new TextEncoder().encode(resolveAuthJwtSecret());
 }
 
 export type VerifiedSession = {
